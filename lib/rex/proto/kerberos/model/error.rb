@@ -121,10 +121,31 @@ module Rex
 
           # Runtime Error which can be raised by the Rex::Proto::Kerberos API
           class KerberosError < ::StandardError
+            # @return [Rex::Proto::Kerberos::Model::Error::ErrorCode] A ErrorCode generated from a KDC
+            attr_reader :error_code
+
+            def initialize(message = nil, error_code: nil)
+              super(message || "Kerberos Error")
+              @error_code = error_code
+            end
           end
 
           # Runtime Decoding Error which can be raised by the Rex::Proto::Kerberos API
           class KerberosDecodingError < KerberosError
+            def initialize(message = nil)
+              super(message || "Kerberos Decoding Error")
+            end
+          end
+
+          # Runtime Error which can be raised by the Rex::Proto::Kerberos API when the Kerberos target does not support
+          # the chosen Encryption method
+          class KerberosEncryptionNotSupported < KerberosError
+            # @return [Number] One of the encryption types defined within Rex::Proto::Kerberos::Crypto
+            attr_reader :encryption_type
+
+            def initialize(message = nil, encryption_type: nil)
+              super(message || "Kerberos target does not support the required encryption")
+            end
           end
         end
       end
