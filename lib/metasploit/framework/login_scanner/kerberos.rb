@@ -11,6 +11,7 @@ module Metasploit
 
         DEFAULT_PORT = 88
         REALM_KEY = Metasploit::Model::Realm::Key::ACTIVE_DIRECTORY_DOMAIN
+        DEFAULT_REALM = nil
 
         def attempt_login(credential)
           result_options = {
