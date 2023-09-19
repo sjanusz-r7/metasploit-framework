@@ -42,7 +42,7 @@ module Metasploit
 
           begin
             pg_conn = Msf::Db::PostgresPR::Connection.new(db_name,credential.public,credential.private,uri)
-          rescue RuntimeError => e
+          rescue ::RuntimeError => e
             case e.to_s.split("\t")[1]
               when "C3D000"
                 result_options.merge!({

@@ -11,6 +11,7 @@ class MetasploitModule < Msf::Auxiliary
   include Msf::Auxiliary::AuthBrute
   include Msf::Auxiliary::Scanner
   include Msf::Auxiliary::Report
+  include Msf::Auxiliary::CommandShell
 
   # Creates an instance of this module.
   def initialize(info = {})
@@ -80,6 +81,18 @@ class MetasploitModule < Msf::Auxiliary
         create_credential_login(credential_data)
 
         print_good "#{ip}:#{rport} - Login Successful: #{result.credential}"
+
+        require 'pry-byebug'; binding.pry;
+        if datastore['CreateSession'] == true
+          begin
+            # TODO: This is nil.
+            postgresql_client = result.proof
+            session_setup(result, postgresql_client)
+          rescue ::StandardError => e
+            elog('Failed: ', error: e)
+            print_error(e)
+          end
+        end
       else
         invalidate_login(credential_data)
         vprint_error "#{ip}:#{rport} - LOGIN FAILED: #{result.credential} (#{result.status}: #{result.proof})"
@@ -98,6 +111,27 @@ class MetasploitModule < Msf::Auxiliary
     datastore['RPORT']
   end
 
+  def session_setup(result, client)
+    #return unless client && result
 
+    platform = scanner.get_platform(client)
 
+    rstream = client.dispatcher.tcp_socket
+
+    my_session = ::Msf::Sessions::PostgreSQL.new(rstream, { client: client } )
+
+    merging = {
+      'USERPASS_FILE' => nil,
+      'USER_FILE'     => nil,
+      'PASS_FILE'     => nil,
+      'USERNAME'      => result.credential.public,
+      'PASSWORD'      => result.credential.private
+    }
+
+    s = start_session(self, nil, merging, false, my_session.rstream, my_session)
+
+    s.platform = platform
+
+    s
+  end
 end
