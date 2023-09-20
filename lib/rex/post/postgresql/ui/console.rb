@@ -4,41 +4,30 @@ module Rex
   module Post
     module PostgreSQL
       module Ui
-
         ###
         #
         # This class provides a shell driven interface to the PostgreSQL client API.
         #
         ###
         class Console
-
           include Rex::Ui::Text::DispatcherShell
 
           # Dispatchers
           require 'rex/post/postgresql/ui/console/command_dispatcher'
           require 'rex/post/postgresql/ui/console/command_dispatcher/core'
-          #require 'rex/post/postgresql/ui/console/command_dispatcher/shares'
+          require 'rex/post/postgresql/ui/console/command_dispatcher/db'
 
           #
-          # Initialize the SMB console.
+          # Initialize the PostgreSQL console.
           #
-          # @param [Msf::Sessions::SMB] session
+          # @param [Msf::Sessions::PostgreSQL] session
           def initialize(session)
-            # @type [::Msf::Config.meterpreter_history]
-            todo_hist_file = nil
-            super("%undPostgreSQL%clr", '>', todo_hist_file, nil, :postgresql)
-            #if Rex::Compat.is_windows
-              #super("smb")
-            #  super('postgresql')
-            #else
-            #  todo_hist_file = nil # Msf::Config.meterpreter_history
-              #super("%undSMB%clr", '>', todo_hist_file, nil, :smb)
-            #  super("%undPostgreSQL%clr", '>', todo_hist_file, nil, :postgresql)
-            #end
-
             # The postgresql client context
             self.session = session
             self.client = session.client
+            prompt = "%undPostgreSQL @ #{self.client.conn.remote_address.ip_address}:#{self.client.conn.remote_address.ip_port}%clr"
+            history_manager = self.session.framework&.history_manager&.with_context(name: :postgresql)
+            super(prompt, '>', history_manager, self.session&.framework, :postgresql)
 
             # Queued commands array
             self.commands = []
@@ -46,19 +35,16 @@ module Rex
             # Point the input/output handles elsewhere
             reset_ui
 
-            enstack_dispatcher(Rex::Post::SMB::Ui::Console::CommandDispatcher::Core)
-            #enstack_dispatcher(Rex::Post::SMB::Ui::Console::CommandDispatcher::Shares)
+            enstack_dispatcher(::Rex::Post::PostgreSQL::Ui::Console::CommandDispatcher::Core)
+            enstack_dispatcher(::Rex::Post::PostgreSQL::Ui::Console::CommandDispatcher::DB)
 
             # Set up logging to whatever logsink 'core' is using
-            #if ! $dispatcher['smb']
             if ! $dispatcher['postgresql']
-              #$dispatcher['smb'] = $dispatcher['core']
               $dispatcher['postgresql'] = $dispatcher['core']
             end
           end
 
           #
-          # Called when someone wants to interact with the smb client.  It's
           # Called when someone wants to interact with the postgresql client.  It's
           # assumed that init_ui has been called prior.
           #
@@ -103,7 +89,7 @@ module Rex
               log_error(e.message)
             rescue ::Errno::EPIPE, ::OpenSSL::SSL::SSLError, ::IOError
               self.session.kill
-            rescue ::Exception => e
+            rescue ::StandardError => e
               log_error("Error running command #{method}: #{e.class} #{e}")
               elog(e)
             end

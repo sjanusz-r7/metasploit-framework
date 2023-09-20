@@ -6,15 +6,12 @@ module Rex
   module Post
     module PostgreSQL
       module Ui
-
         ###
         #
-        # Base class for all command dispatchers within the SMB console user
-        # interface.
+        # Base class for all command dispatchers within the PostgreSQL console user interface.
         #
         ###
         module Console::CommandDispatcher
-
           include Rex::Ui::Text::DispatcherShell::CommandDispatcher
 
           #
@@ -50,7 +47,7 @@ module Rex
           end
 
           #
-          # Returns the smb client context.
+          # Returns the PostgreSQL client context.
           #
           # @return [PostgreSQL::Client]
           def client
@@ -59,7 +56,7 @@ module Rex
           end
 
           #
-          # Returns the smb session context.
+          # Returns the PostgreSQL session context.
           #
           # @return [Msf::Sessions::PostgreSQL]
           def session
@@ -67,22 +64,13 @@ module Rex
             console.session
           end
 
-          # TODO: Rename - required for most of RubySMB's APIs, i.e. "path = "\\\\#{address}\\share"
           def address
-            # TOOD: How do we accurately get the target smb address when pivoting? Also Needs ipv6 support
-            address, port = client.dispatcher.tcp_socket.peerinfo.split(':')
-            address
+            self.client.conn.remote_address.ip_address
           end
 
-          # PostgreSQL doesn't have shares.
-          #
-          # Returns the active share
-          #
-          # @return [RubySMB::SMB2::Tree]
-          #def active_share
-          #  console = shell
-          #  console.active_share
-          #end
+          def port
+            self.client.conn.remote_address.ip_port
+          end
 
           #
           # Returns the commands that meet the requirements
@@ -120,9 +108,9 @@ module Rex
           #
           def msf_loaded?
             return @msf_loaded unless @msf_loaded.nil?
-            # if we get here we must not have initialized yet
 
-            @msf_loaded = !!(client.framework)
+            # if we get here we must not have initialized yet
+            @msf_loaded = !!(self.client.framework)
           end
 
           #

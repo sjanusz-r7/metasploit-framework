@@ -5,6 +5,7 @@
 
 require 'metasploit/framework/credential_collection'
 require 'metasploit/framework/login_scanner/postgres'
+require 'rex/post/postgresql'
 
 class MetasploitModule < Msf::Auxiliary
   include Msf::Exploit::Remote::Postgres
@@ -67,6 +68,7 @@ class MetasploitModule < Msf::Auxiliary
       connection_timeout: 30,
       framework: framework,
       framework_module: self,
+      use_client_as_proof: datastore['CreateSession']
     )
 
     scanner.scan! do |result|
@@ -82,10 +84,9 @@ class MetasploitModule < Msf::Auxiliary
 
         print_good "#{ip}:#{rport} - Login Successful: #{result.credential}"
 
-        require 'pry-byebug'; binding.pry;
+        #require 'pry-byebug'; binding.pry;
         if datastore['CreateSession'] == true
           begin
-            # TODO: This is nil.
             postgresql_client = result.proof
             session_setup(result, postgresql_client)
           rescue ::StandardError => e
@@ -112,11 +113,22 @@ class MetasploitModule < Msf::Auxiliary
   end
 
   def session_setup(result, client)
-    #return unless client && result
+    return unless (result && client)
 
-    platform = scanner.get_platform(client)
+    #require 'pry-byebug'; binding.pry;
 
-    rstream = client.dispatcher.tcp_socket
+    platform = 'MacOS' # scanner.get_platform(client)
+
+    # TODO: Add 'dispatcher' to PostgreSQL client
+    #rstream = client.dispatcher.tcp_socket
+    rstream = client.conn
+
+
+    begin
+      ::Msf::Sessions::Postgresql
+    rescue ::StandardError => _e
+
+    end
 
     my_session = ::Msf::Sessions::PostgreSQL.new(rstream, { client: client } )
 

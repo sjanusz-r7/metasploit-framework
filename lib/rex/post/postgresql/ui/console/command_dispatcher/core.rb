@@ -86,23 +86,25 @@ module Rex
           end
 
           def cmd_background
-            # TODO: client is postgresql so doesn't have a name, and session isn't available in this context
-            # TODO: Check this.
-            # print_status("Backgrounding session #{client.name}...")
-            print_status("Backgrounding session...")
-            session.interacting = false
+            print_status("Backgrounding session #{self.session.name}...")
+            self.session.interacting = false
           end
 
           alias cmd_bg cmd_background
           alias cmd_bg_help cmd_background_help
 
           #
-          # Terminates the SMB session.
+          # Terminates the PostgreSQL session.
           #
           def cmd_exit(*args)
-            print_status('Shutting down PostgreSQL... TODO properly disconnect/close socket etc')
-            # client.core.shutdown rescue nil
-            # client.shutdown_passive_dispatcher
+            print_status('Shutting down PostgreSQL...')
+
+            begin
+              self.client.close
+            rescue ::RuntimeError => e # Connection already closed
+              print_warning e.message
+            end
+
             shell.stop
           end
 
@@ -140,10 +142,8 @@ module Rex
 
             if expressions.empty?
               print_status('Starting IRB shell...')
-              # TODO: What are the semantics of session vs client for SMB?
-              # TODO: Check this.
-              print_status("You are in the \"client\" (session) object\n")
-              Rex::Ui::Text::Shell::HistoryManager.with_context(name: :irb) do
+              print_status("You are in the PostgreSQL command dispatcher object\n")
+              framework.history_manager.with_context(name: :irb) do
                 Rex::Ui::Text::IrbShell.new(session).run
               end
             else

@@ -11,6 +11,14 @@ module Metasploit
       class Postgres
         include Metasploit::Framework::LoginScanner::Base
 
+        # @returns [Boolean] If a login is successful and this attribute is true - a PostgreSQL::Client instance is used as proof,
+        #   and the socket is not immediately closed
+        attr_accessor :use_client_as_proof
+
+        # @!attribute dispatcher
+        #   @return [PostgreSQL::Dispatcher::Socket]
+        attr_accessor :dispatcher
+
         DEFAULT_PORT         = 5432
         DEFAULT_REALM        = 'template1'
         LIKELY_PORTS         = [ DEFAULT_PORT ]
@@ -70,8 +78,16 @@ module Metasploit
           end
 
           if pg_conn
-            pg_conn.close
             result_options[:status] = Metasploit::Model::Login::Status::SUCCESSFUL
+
+            # This module no long owns the socket, return it as proof so the calling context can perform additional operations
+            # Additionally assign values to nil to avoid closing the socket etc automatically
+            if use_client_as_proof
+              result_options[:proof] = pg_conn
+              pg_conn = nil
+            else
+              pg_conn.close
+            end
           else
             result_options[:status] = Metasploit::Model::Login::Status::INCORRECT
           end
