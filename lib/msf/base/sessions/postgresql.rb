@@ -62,20 +62,16 @@ class Msf::Sessions::PostgreSQL # < Msf::Sessions::CommandShell
     'PostgreSQL'
   end
 
-  protected
-
   ##
   # :category: Msf::Session::Interactive implementors
   #
   # Initializes the console's I/O handles.
   #
   def init_ui(input, output)
-    self.user_input = input
-    self.user_output = output
-    self.console.init_ui(self.user_input, self.user_output)
-    self.console.set_log_source(self.log_source)
+    super(input, output)
 
-    super
+    self.console.init_ui(input, output)
+    self.console.set_log_source(self.log_source)
   end
 
   ##
@@ -87,6 +83,8 @@ class Msf::Sessions::PostgreSQL # < Msf::Sessions::CommandShell
     self.console.unset_log_source
     self.console.reset_ui
   end
+
+  protected
 
   ##
   # :category: Msf::Session::Interactive implementors
