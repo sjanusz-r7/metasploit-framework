@@ -96,6 +96,16 @@ def run
   end
 
   begin
+    # TODO: It might be worth using datastore['SESSIONS'] later to scan multiple sessions at once.
+    if self.respond_to?('run_session') && self.datastore['SESSION']
+      return if self.has_fatal_errors?
+
+      nmod = self.replicant
+      nmod.datastore = self.datastore
+      result = nmod.run_session(self.framework.sessions.get(nmod.datastore['SESSION']))
+
+      return { "#{self.session.session_host}:#{self.session.session_port}" => result }
+    end
 
   if (self.respond_to?('run_host'))
     loop do
@@ -121,6 +131,7 @@ def run
           nmod.datastore = thr_datastore
 
           begin
+            #require 'pry-byebug'; binding.pry;
             res << { targ => nmod.run_host(targ) }
           rescue ::Rex::BindFailed
             if datastore['CHOST']

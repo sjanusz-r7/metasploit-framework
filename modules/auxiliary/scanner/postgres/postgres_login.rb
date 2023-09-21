@@ -115,22 +115,17 @@ class MetasploitModule < Msf::Auxiliary
   def session_setup(result, client)
     return unless (result && client)
 
-    #require 'pry-byebug'; binding.pry;
-
-    platform = 'MacOS' # scanner.get_platform(client)
-
-    # TODO: Add 'dispatcher' to PostgreSQL client
-    #rstream = client.dispatcher.tcp_socket
+    platform = client.get_version_info[:platform].realname
     rstream = client.conn
 
-
     begin
+      # TODO: Fix this so that Postgresql is loaded without this.
       ::Msf::Sessions::Postgresql
     rescue ::StandardError => _e
-
+      # ignored.
     end
 
-    my_session = ::Msf::Sessions::PostgreSQL.new(rstream, { client: client } )
+    my_session = ::Msf::Sessions::PostgreSQL.new(rstream, { client: client })
 
     merging = {
       'USERPASS_FILE' => nil,

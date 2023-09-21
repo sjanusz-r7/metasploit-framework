@@ -17,6 +17,7 @@ module Rex
 
           include Rex::Post::PostgreSQL::Ui::Console::CommandDispatcher
 
+          # TODO: This might be a bad idea.
           # https://www.postgresql.org/docs/current/catalog-pg-database.html
           # @type [Hash<String, String>]
           DEFAULT_COLUMN_MAPPINGS = {

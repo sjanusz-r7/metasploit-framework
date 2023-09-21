@@ -67,6 +67,7 @@ module Msf::PostMixin
     # Msf::Exploit#setup for exploits, NoMethodError for post modules
     super rescue NoMethodError
 
+    # We are messing up here.
     @session.init_ui(self.user_input, self.user_output) if @session
     @sysinfo = nil
   end

@@ -56,7 +56,7 @@ class Connection
     end
   end
 
-  def initialize(database, user, password=nil, uri = nil)
+  def initialize(database, user, password = nil, uri = nil)
     uri ||= DEFAULT_URI
 
     @transaction_status = nil
@@ -134,6 +134,8 @@ class Connection
     end
   end
 
+  # TODO: This could be moved out to a DB-agnostic module such as
+  # ::Msf::Db::Interface::Query
   def query(sql)
     write_message(Query.new(sql))
 
@@ -170,6 +172,120 @@ class Connection
     result
   end
 
+  def get_version_info
+    return { error: :disconnected } unless @conn
+
+    # Example output:
+    # PostgreSQL 16.0 (Debian 16.0-1.pgdg120+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14) 12.2.0, 64-bit
+    query_result = self.query('SELECT VERSION();')
+    version_string = query_result.rows.first.first
+    split_version_string = version_string.split
+
+    version_info = {}
+    version_info[:postgresql_version] = split_version_string[1]
+    version_info[:platform_string] = split_version_string[5]
+    version_info[:compiler_name] = split_version_string[8]
+    version_info[:compiler_version] = split_version_string[11]
+
+    version_info[:arch] = ::Rex::Arch::ARCH_X64 if split_version_string.last == '64-bit'
+    version_info[:arch] = ::Rex::Arch::ARCH_X86 if split_version_string.last == '32-bit'
+    version_info[:arch] = ::Rex::Arch::ARCH_ARMBE if split_version_string.last.downcase.include?('be')
+    version_info[:arch] = ::Rex::Arch::ARCH_ARMLE if split_version_string.last.downcase.include?('le')
+    version_info[:arch] = version_info[:arch] || 'unknown' # Default to unknown
+
+    version_info[:platform] = ::Msf::Module::Platform::Windows if version_info[:platform_string].downcase.include?('win')
+    version_info[:platform] = ::Msf::Module::Platform::Linux if version_info[:platform_string].downcase.include?('linux')
+    version_info[:platform] = ::Msf::Module::Platform::OSX if version_info[:platform_string].downcase.include?('osx')
+    version_info[:platform] = ::Msf::Module::Platform::Mac if version_info[:platform_string].downcase.include?('mac')
+    version_info[:platform] = version_info[:platform] || 'unknown'
+
+    @version_info = version_info
+  end
+
+  def version_info
+    # This won't change on the same session.
+    return @version_info if @version_info
+
+    self.get_version_info
+  end
+
+  def get_databases
+    return { error: :disconnected } unless @conn # Can't get the schema if we have disconnected.
+
+    db_names_query = 'SELECT datname FROM pg_database;'
+    self.query(db_names_query).rows.flatten
+  end
+
+  def get_tables(database: '')
+    return { error: :disconnected } unless @conn # Can't get the schema if we have disconnected.
+
+    require 'pry-byebug'; binding.pry
+
+    #table_names_query = "SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname == #{database};"
+    table_names_query = "SELECT tablename FROM pg_catalog.pg_tables WHERE tableowner == #{database};"
+    self.query(table_names_query).rows.flatten
+  end
+
+  def get_columns(table: '')
+    return { error: :disconnected } unless @conn # Can't get the schema if we have disconnected.
+
+    column_names_query = "SELECT * FROM #{table};"
+    self.query(column_names_query).rows.flatten
+  end
+
+  def get_schema(ignored_databases: [])
+    return { error: :disconnected } unless @conn # Can't get the schema if we have disconnected.
+
+    pg_schema = {}
+    database_names = self.get_databases
+    pg_schema[:all_databases] = database_names
+
+    return pg_schema if database_names.empty?
+
+    excluded_databases = (database_names & ignored_databases)
+    pg_schema[:ignored_databases] = excluded_databases
+
+    pg_schema[:evaluated_databases] = []
+
+    extractable_database_names = database_names - ignored_databases
+    extractable_database_names.each do |database_name|
+      tmp_db = {}
+      tmp_db[:DBName] = database_name
+      tmp_db[:Tables] = []
+
+      # We are already logged in but double-check this
+      #postgres_login({ database: database_name })
+
+      # TODO: Does this get the tables for all databases?
+      #
+      #table_names_query = "SELECT c.relname, n.nspname FROM pg_catalog.pg_class c LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname NOT IN ('pg_catalog','pg_toast') AND pg_catalog.pg_table_is_visible(c.oid);"
+      #tmp_tblnames = self.query(table_names_query).rows.flatten
+      #tmp_tblnames = self.get_tables(database: database_name)
+      #if tmp_tblnames && !tmp_tblnames.empty?
+      #  tmp_tblnames.each do |tbl_row|
+      #    tmp_tbl = {}
+      #    tmp_tbl[:TableName] = tbl_row[0]
+      #    tmp_tbl[:Columns] = []
+      #    # TODO: Add self.columns(database: db)
+      #    #column_names_query = "SELECT  A.attname, T.typname, A.attlen FROM pg_class C, pg_namespace N, pg_attribute A, pg_type T WHERE  (N.oid=C.relnamespace) AND (A.attrelid=C.oid) AND (A.atttypid=T.oid) AND (A.attnum>0) AND (NOT A.attisdropped) AND (N.nspname ILIKE 'public') AND (c.relname='#{tbl_row[0]}');"
+      #    tmp_column_names = self.get_columns(table: tbl_row[0])
+      #    if tmp_column_names && !tmp_column_names.empty?
+      #      tmp_column_names.each do |column_row|
+      #        tmp_column = {}
+      #        tmp_column[:ColumnName] = column_row[0]
+      #        tmp_column[:ColumnType] = column_row[1]
+      #        tmp_column[:ColumnLength] = column_row[2]
+      #        tmp_tbl[:Columns] << tmp_column
+      #      end
+      #    end
+      #    tmp_db[:Tables] << tmp_tbl
+      #  end
+      #end
+      pg_schema[:evaluated_databases] << tmp_db
+    end
+
+    pg_schema
+  end
 
   # @param [AuthenticationSASL] msg
   # @param [String] user
