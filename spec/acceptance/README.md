@@ -61,6 +61,26 @@ Run the test suite:
 MYSQL_RPORT=9000 SPEC_OPTS='--tag acceptance' SPEC_HELPER_LOAD_METASPLOIT=false bundle exec rspec ./spec/acceptance/mysql_spec.rb
 ```
 
+### SMB
+
+Build the Docker image:
+
+```
+docker compose build -f ./test/smb/docker-compose.yml
+```
+
+Run a target:
+
+```
+docker run -it --rm --publish 127.0.0.1:445:445 --publish 127.0.0.1:139:139 smb-samba:latest
+```
+
+Run the test suite:
+
+```
+SMB_USERNAME=acceptance_tests_user SMB_PASSWORD=acceptance_tests_password SPEC_OPTS='--tag acceptance' SPEC_HELPER_LOAD_METASPLOIT=false bundle exec rspec ./spec/acceptance/smb_spec.rb
+```
+
 #### Allure reports
 
 Generate allure reports locally:
