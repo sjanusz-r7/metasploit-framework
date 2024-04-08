@@ -76,7 +76,7 @@ jobs:
     name: ${{ matrix.dockerfile_path }} - ${{ matrix.os }} - Ruby ${{ matrix.ruby }}
     steps:
       - name: Install system dependencies
-        run: sudo apt-get install -y --no-install-recommends libpcap-dev graphviz
+        run: sudo apt-get install -y --no-install-recommends libpcap-dev graphviz smbclient
 
       - name: Checkout code
         uses: actions/checkout@v4
