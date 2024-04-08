@@ -120,7 +120,7 @@ jobs:
         # Additionally - flakey tests should be fixed or marked as flakey instead of silently retried
         run: |
           docker run -d --rm --publish 445:445 --publish 139:139 smb-samba:v1 --name smb-acceptance
-          smbclient -U 'acceptance_tests_user%acceptance_tests_password' -L smb-acceptance
+          smbclient -U 'acceptance_tests_user%acceptance_tests_password' -L 127.0.0.1
           bundle exec rspec spec/acceptance/smb_spec.rb
 
       - name: Kill Docker Container
