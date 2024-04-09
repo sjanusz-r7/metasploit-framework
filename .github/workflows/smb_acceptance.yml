@@ -45,21 +45,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 40
 
-    services:
-      smb:
-        image: ${{ matrix.docker_image }}
-        ports:
-          - 445:445
-          - 139:139
-        env:
-          SMB_USERNAME: acceptance_tests_user
-          SMB_PASSWORD: acceptance_tests_password
-        options: >-
-          --health-cmd smbclient -U 'acceptance_tests_user%acceptance_tests_password' -L 127.0.0.1
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     strategy:
       fail-fast: true
       matrix:
@@ -67,18 +52,14 @@ jobs:
           - '3.2'
         os:
           - ubuntu-latest
-        docker_compose_path:
-          - docker-compose.yml
-        dockerfile_path:
-          - Dockerfile
 
     env:
       RAILS_ENV: test
 
-    name: ${{ matrix.dockerfile_path }} - ${{ matrix.os }} - Ruby ${{ matrix.ruby }}
+    name: Samba - ${{ matrix.os }} - Ruby ${{ matrix.ruby }}
     steps:
       - name: Install system dependencies
-        run: sudo apt-get install -y --no-install-recommends libpcap-dev graphviz smbclient
+        run: sudo apt-get install -y --no-install-recommends libpcap-dev graphviz
 
       - name: Checkout code
         uses: actions/checkout@v4
@@ -86,7 +67,8 @@ jobs:
       - name: Create Docker Image
         working-directory: 'test/smb'
         run: |
-          docker build -t smb-samba:v1 -f ${{ matrix.dockerfile_path }} .
+          docker compose build
+          docker compose up --wait -d
 
       - name: Setup Ruby
         env:
@@ -98,19 +80,11 @@ jobs:
           ruby-version: '${{ matrix.ruby }}'
           bundler-cache: true
 
-      - name: Extract runtime version
-        run: |
-          echo "RUNTIME_VERSION=ubuntu:22.04" >> $GITHUB_ENV
-          echo "DOCKER_IMAGE_FILENAME=smb-samba:v1" >> $GITHUB_ENV
-        env:
-          DOCKER_IMAGE: ${{ matrix.docker_image }}
-          OS: ${{ matrix.os }}
-
       - name: acceptance
         env:
           SPEC_HELPER_LOAD_METASPLOIT: false
           SPEC_OPTS: "--tag acceptance --require acceptance_spec_helper.rb --color --format documentation --format AllureRspec::RSpecFormatter"
-          RUNTIME_VERSION: ${{ env.RUNTIME_VERSION }}
+          RUNTIME_VERSION: 'latest'
         # Unix run command:
         #   SPEC_HELPER_LOAD_METASPLOIT=false bundle exec ./spec/acceptance
         # Windows cmd command:
@@ -119,20 +93,14 @@ jobs:
         # Note: rspec retry is intentionally not used, as it can cause issues with allure's reporting
         # Additionally - flakey tests should be fixed or marked as flakey instead of silently retried
         run: |
-          docker run -d --rm --publish 445:445 --publish 139:139 smb-samba:v1 --name smb-acceptance
-          smbclient -U 'acceptance_tests_user%acceptance_tests_password' -L 127.0.0.1
           bundle exec rspec spec/acceptance/smb_spec.rb
-
-      - name: Kill Docker Container
-        run: |
-          docker container kill smb-acceptance
 
       - name: Archive results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           # Provide a unique artifact for each matrix os, otherwise race conditions can lead to corrupt zips
-          name: ${{ env.DOCKER_IMAGE_FILENAME }}-${{ matrix.os }}
+          name: smb-samba-${{ matrix.os }}
           path: tmp/allure-raw-data
 
   # Generate a final report from the previous test results

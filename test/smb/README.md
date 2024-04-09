@@ -11,7 +11,7 @@ docker compose build
 
 - Run:
 ```shell
-docker run -it --rm --publish 127.0.0.1:445:445 --publish 127.0.0.1:139:139 smb-samba:latest
+docker compose up -d --wait
 ```
 
 ## Adding More Shares & Files

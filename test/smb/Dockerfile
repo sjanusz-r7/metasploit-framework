@@ -10,13 +10,10 @@ EXPOSE 445 139
 SHELL ["/bin/bash", "-c"]
 
 # Install Samba
-RUN apt update && apt install -y samba
+RUN apt update && apt install -y samba smbclient
 
 # To add a credential to Samba, the user needs to be created on the system
 RUN useradd -m acceptance_tests_user
-
-# Allow incoming Samba traffic - Is this necessary, or is UFW disabled by default?
-#RUN ufw allow samba
 
 # Configure a few shares
 COPY shares shares
