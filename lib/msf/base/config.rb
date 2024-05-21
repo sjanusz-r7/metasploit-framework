@@ -74,7 +74,8 @@ class Config < Hash
       'PluginDirectory'     => "plugins",
       'DataDirectory'       => "data",
       'LootDirectory'       => "loot",
-      'LocalDirectory'      => "local"
+      'LocalDirectory'      => "local",
+      'HistoriesDirectory'  => "histories"
     }
 
   ##
@@ -235,6 +236,13 @@ class Config < Hash
     self.new.postgresql_session_history
   end
 
+  # Returns the full path to the PostgreSQL interactive query history file
+  #
+  # @return [String] path to the interactive query history file.
+  def self.postgresql_session_interactive_history
+    self.new.postgresql_session_interactive_history
+  end
+
   # Returns the full path to the MSSQL session history file.
   #
   # @return [String] path to the history file.
@@ -242,11 +250,25 @@ class Config < Hash
     self.new.mssql_session_history
   end
 
+  # Returns the full path to the MSSQL interactive query history file
+  #
+  # @return [String] path to the interactive query history file.
+  def self.mssql_session_interactive_history
+    self.new.mssql_session_interactive_history
+  end
+
   # Returns the full path to the MySQL session history file.
   #
   # @return [String] path to the history file.
   def self.mysql_session_history
     self.new.mysql_session_history
+  end
+
+  # Returns the full path to the MySQL interactive query history file
+  #
+  # @return [String] path to the interactive query history file.
+  def self.mysql_session_history_interactive
+    self.new.mysql_session_history_interactive
   end
 
   def self.pry_history
@@ -343,6 +365,10 @@ class Config < Hash
     config_directory + FileSep + self['ConfigFile']
   end
 
+  def histories_directory
+    config_directory + FileSep + self['HistoriesDirectory']
+  end
+
   # Returns the full path to the history file.
   #
   # @return [String] path the history file.
@@ -363,15 +389,27 @@ class Config < Hash
   end
 
   def postgresql_session_history
-    config_directory + FileSep + "postgresql_session_history"
+    histories_directory + FileSep + "postgresql_session_history"
+  end
+
+  def postgresql_session_history_interactive
+    histories_directory + FileSep + "postgresql_session_interactive_history"
   end
 
   def mysql_session_history
-    config_directory + FileSep + "mysql_session_history"
+    histories_directory + FileSep + "mysql_session_history"
+  end
+
+  def mysql_session_history_interactive
+    histories_directory + FileSep + "mysql_session_interactive_history"
   end
 
   def mssql_session_history
-    config_directory + FileSep + "mssql_session_history"
+    histories_directory + FileSep + "mssql_session_history"
+  end
+
+  def mssql_session_history_interactive
+    histories_directory + FileSep + "mssql_session_interactive_history"
   end
 
   def pry_history
@@ -495,6 +533,7 @@ class Config < Hash
     FileUtils.mkdir_p(user_module_directory)
     FileUtils.mkdir_p(user_plugin_directory)
     FileUtils.mkdir_p(user_data_directory)
+    FileUtils.mkdir_p(histories_directory)
   end
 
   # Loads configuration from the supplied file path, or the default one if
