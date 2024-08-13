@@ -87,6 +87,8 @@ class Msf::Ui::Console::CommandDispatcher::Developer
 
   # @return [Array<String>] The list of modified file paths since startup
   def modified_file_paths(print_errors: true)
+    return [] if Rex::Compat.is_windows || Rex::Compat.is_cygwin || Rex::Compat.is_wow64
+
     files, is_success = modified_files
 
     unless is_success
