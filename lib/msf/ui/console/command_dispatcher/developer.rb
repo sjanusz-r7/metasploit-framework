@@ -514,13 +514,38 @@ class Msf::Ui::Console::CommandDispatcher::Developer
 
   private
 
+  def capture3(cmd, opts: {})
+    return [-1, '', ''] if cmd.empty?
+
+    require 'tempfile' unless defined?(::Tempfile)
+
+    stdout = ::Tempfile.new('stdout')
+    stderr = ::Tempfile.new('stderr')
+
+    if opts[:dir]
+      block = proc do |in_cmd, in_stdout, in_stderr, in_opts|
+        ::Dir.chdir(in_opts[:dir]) do |_|
+          system(in_cmd, out: [in_stdout.path, 'a'], err: [in_stderr.path, 'a'])
+        end
+      end
+    else
+      block = proc do |in_cmd, in_stdout, in_stderr, _in_opts|
+        system(in_cmd, out: [in_stdout.path, 'a'], err: [in_stderr.path, 'a'])
+      end
+    end
+
+    block.call(cmd, stdout, stderr)
+
+    { status_code: $CHILD_STATUS, stdout: ::File.binread(stdout.path), stderr: ::File.binread(stderr.path) }
+  end
+
   def modified_files
     # Using an array avoids shelling out, so we avoid escaping/quoting
     changed_files = %w[git diff --name-only]
     begin
-      output, status = Open3.capture2e(*changed_files, chdir: Msf::Config.install_root)
-      is_success = status.success?
-      output = output.split("\n")
+      exit_code, stdout, stderr = capture3(*changed_files, opts: { dir: Msf::Config.install_root })
+      output = (stdout + stderr).split("\n")
+      is_success = (exit_code == 0)
     rescue => e
       elog(e)
       output = []
