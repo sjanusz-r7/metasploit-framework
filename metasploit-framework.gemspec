@@ -219,7 +219,7 @@ Gem::Specification.new do |spec|
   # SSH server library with ed25519
   spec.add_runtime_dependency 'hrr_rb_ssh-ed25519'
   # Needed for irb internal command
-  spec.add_runtime_dependency 'irb', '~> 1.7.4'
+  spec.add_runtime_dependency 'irb', '~> 1.14.0'
 
   # AWS enumeration modules
   spec.add_runtime_dependency 'aws-sdk-s3'

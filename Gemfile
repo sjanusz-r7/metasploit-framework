@@ -18,7 +18,7 @@ group :development do
   gem 'pry-byebug'
   # Ruby Debugging Library - rebuilt and included by default from Ruby 3.1 onwards.
   # Replaces the old lib/debug.rb and provides more features.
-  gem 'debug', '>= 1.0.0'
+  gem 'debug', '>= 1.9.2'
   # module documentation
   gem 'octokit'
   # memory profiling
