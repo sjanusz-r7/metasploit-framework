@@ -83,6 +83,11 @@ class Output::Stdio < Rex::Ui::Text::Output
   # Prints the supplied message to standard output.
   #
   def print_raw(msg = '')
+
+    if msg.include?('%ap1')
+      # require 'pry-byebug'; binding.pry
+    end
+
     if (Rex::Compat.is_windows and supports_color?)
       WindowsConsoleColorSupport.new(io).write(msg)
     else

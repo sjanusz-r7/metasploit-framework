@@ -45,6 +45,11 @@ module Msf
           keys
         end
 
+
+        def log(s)
+          File.open('/tmp/dev.log', 'a') { |f| f.puts s.inspect }
+        end
+
         #
         # Tab completion options values
         #
@@ -53,17 +58,23 @@ module Msf
             option_name = str.chop
             option_value = ''
 
+            # $stderr.puts 'we are here for the scaenario'
+
             ::Reline.completion_append_character = ' '
-            return tab_complete_option_values(mod, option_value, words, opt: option_name).map { |value| "#{str}#{value}" }
+            result = tab_complete_option_values(mod, option_value, words, opt: option_name).map { |value| "#{str}#{value}" }
+            log([str, words, result])
+            return result
           elsif str.include?('=')
             str_split = str.split('=')
             option_name = str_split[0].strip
             option_value = str_split[1].strip
 
+            # $stderr.puts 'we are b'
             ::Reline.completion_append_character = ' '
             return tab_complete_option_values(mod, option_value, words, opt: option_name).map { |value| "#{option_name}=#{value}" }
           end
 
+          # $stderr.puts 'we are c'
           ::Reline.completion_append_character = ''
           tab_complete_option_names(mod, str, words).map { |name| "#{name}=" }
         end

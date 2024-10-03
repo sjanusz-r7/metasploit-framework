@@ -415,6 +415,7 @@ module DispatcherShell
       str = "#{opts[:preposing]}#{str}"
     end
 
+    # $stderr.puts 'inside dispatcher shell'
     ::Reline.completion_append_character = ' '
     ::Reline.completion_case_fold = false
 

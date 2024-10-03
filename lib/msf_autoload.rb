@@ -347,3 +347,24 @@ require 'expect'
 
 # XXX: Should be removed once the `lib/metasploit` folder is loaded by Zeitwerk
 require 'metasploit/framework/hashes'
+
+# TODO: Make a pull request for this
+require 'reline'
+class ::Reline::ANSI
+  def encoding
+    ::Encoding::UTF_8
+  end
+end
+#
+class ::Reline::Core
+
+  alias old_completion_append_character= completion_append_character=
+  alias old_completion_append_character completion_append_character
+
+  def completion_append_character=(v)
+    # require 'pry-byebug'; binding.pry
+    self.old_completion_append_character=(v)
+    # Additionally keep the line_editor in sync
+    line_editor.completion_append_character = self.old_completion_append_character
+  end
+end

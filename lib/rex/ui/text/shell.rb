@@ -67,7 +67,7 @@ module Shell
     if (self.input and self.input.supports_readline)
       # Unless cont_flag because there's no tab complete for continuation lines
       tab_complete_lambda = proc do |str, preposing = nil, postposing = nil|
-        next tab_complete(str, opts: { preposing: preposing, postposing: postposing }).map { |result| result[preposing.to_s.length..] } unless cont_flag
+        next tab_complete(str, opts: { preposing: preposing, postposing: postposing }).map { |result| result[preposing.to_s.length..].encode('UTF-8') } unless cont_flag
       end
       self.input = Input::Readline.new(tab_complete_lambda)
       self.input.output = self.output

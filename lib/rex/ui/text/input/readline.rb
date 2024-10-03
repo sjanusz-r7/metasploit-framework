@@ -142,6 +142,10 @@ begin
 
       ::Reline.input = fd
       ::Reline.output = output
+      Reline.dig_perfect_match_proc = ->(_matched) do
+        Reline.line_editor.instance_variable_set(:@completion_state, Reline::LineEditor::CompletionState::MENU_WITH_PERFECT_MATCH)
+      end
+      #File.open('/tmp/dev.log', 'a') { |f| f.puts "Matched=#{matched.inspect}" } }
 
       line = ::Reline.readline(reset_sequence + prompt, add_history)
 

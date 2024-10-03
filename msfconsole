@@ -6,7 +6,6 @@
 #
 
 require 'pathname'
-require 'reline'
 
 begin
 
