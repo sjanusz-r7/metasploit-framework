@@ -290,7 +290,7 @@ module Msf::DBManager::Session
 
       host = find_or_create_host(h_opts)
       sess_data = {
-        datastore: session.exploit_datastore.to_h,
+        datastore: session.exploit_datastore.to_external_message_h,
         desc: session.info,
         host_id: host.id,
         last_seen: Time.now.utc,

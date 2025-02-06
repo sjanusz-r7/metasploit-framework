@@ -284,6 +284,8 @@ class DataStoreWithFallbacks
     end
 
     self.keys.each do |k|
+      next if self[k].nil?
+
       # TODO arbitrary depth
       if self[k].is_a? Array
         datastore_hash[k.to_s.dup.force_encoding('UTF-8')] = array_nester.call(self[k])
