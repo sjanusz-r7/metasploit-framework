@@ -188,7 +188,13 @@ class DataStore < Hash
   def to_h
     datastore_hash = {}
     self.keys.each do |k|
-      datastore_hash[k.to_s] = self[k].to_s
+      datastore_hash[k.to_s] = self[k]
+
+      begin
+        Marshal.dump(self[k])
+      rescue => e
+        $stderr.puts " Could not serialize datastore key=#{k} with class #{self[k].class} - error: #{e}"
+      end
     end
     datastore_hash
   end
