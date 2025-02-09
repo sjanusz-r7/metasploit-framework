@@ -149,7 +149,7 @@ module Msf::DBManager::Session
 
       session_data = session_dto[:session_data]
       sess_data = {
-          datastore: session_data[:datastore],
+          datastore: session_data[:datastore].select_dumpable_opts_only,
           desc: session_data[:desc],
           host_id: host.id,
           last_seen: session_dto[:time_stamp],
@@ -290,7 +290,7 @@ module Msf::DBManager::Session
 
       host = find_or_create_host(h_opts)
       sess_data = {
-        datastore: session.exploit_datastore.to_h,
+        datastore: session.exploit_datastore.select_dumpable_opts_only,
         desc: session.info,
         host_id: host.id,
         last_seen: Time.now.utc,
@@ -336,7 +336,7 @@ module Msf::DBManager::Session
         via_payload: opts[:via_payload],
         via_exploit: opts[:via_exploit],
         routes: opts[:routes] || [],
-        datastore: opts[:datastore],
+        datastore: opts[:datastore].select_dumpable_opts_only,
         opened_at: opts[:opened_at],
         closed_at: opts[:closed_at],
         last_seen: opts[:last_seen] || opts[:closed_at],

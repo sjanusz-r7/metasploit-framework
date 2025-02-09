@@ -216,6 +216,30 @@ class DataStore < Hash
     datastore_hash
   end
 
+  # Check if an object can be dumped using Marshal
+  # @param value [Object] Value to check
+  # @return [Boolean] True if the object can be dumped, false otherwise.
+  def dumpable?(value)
+    # Known object classes that cannot be dumped by Marshal
+    rejected_klasses = [::Msf::Module, ::IO, ::File, ::Dir, ::Proc, ::Thread].freeze
+
+    rejected_klasses.each { |klass| return false if value.is_a?(klass) }
+
+    true
+  end
+
+  # Create a copy of the datastore that contains only key-value pairs that can be dumped by Marshal
+  # @return [Hash] Datastore hash with only options that can be dumped using Marshal.dump
+  def select_dumpable_opts_only
+    datastore_hash = {}
+    self.each_pair do |k, v|
+      next unless dumpable?(v)
+
+      datastore_hash[k] = v
+    end
+    datastore_hash
+  end
+
   #
   # Persists the contents of the data store to a file
   #
