@@ -1,3 +1,19 @@
+GIT
+  remote: https://github.com/sjanusz-r7/metasploit_data_models
+  revision: aa856a88664aa427e897c90e240ba1223a2fb9a3
+  branch: change-serializing-of-unserializable-values
+  specs:
+    metasploit_data_models (6.0.6)
+      activerecord (~> 7.0)
+      activesupport (~> 7.0)
+      arel-helpers
+      metasploit-concern
+      metasploit-model (>= 3.1)
+      pg
+      railties (~> 7.0)
+      recog
+      webrick
+
 PATH
   remote: .
   specs:
@@ -122,25 +138,25 @@ GEM
     aarch64 (2.1.0)
       racc (~> 1.6)
     abbrev (0.1.2)
-    actionpack (7.0.8.6)
-      actionview (= 7.0.8.6)
-      activesupport (= 7.0.8.6)
+    actionpack (7.0.8.7)
+      actionview (= 7.0.8.7)
+      activesupport (= 7.0.8.7)
       rack (~> 2.0, >= 2.2.4)
       rack-test (>= 0.6.3)
       rails-dom-testing (~> 2.0)
       rails-html-sanitizer (~> 1.0, >= 1.2.0)
-    actionview (7.0.8.6)
-      activesupport (= 7.0.8.6)
+    actionview (7.0.8.7)
+      activesupport (= 7.0.8.7)
       builder (~> 3.1)
       erubi (~> 1.4)
       rails-dom-testing (~> 2.0)
       rails-html-sanitizer (~> 1.1, >= 1.2.0)
-    activemodel (7.0.8.6)
-      activesupport (= 7.0.8.6)
-    activerecord (7.0.8.6)
-      activemodel (= 7.0.8.6)
-      activesupport (= 7.0.8.6)
-    activesupport (7.0.8.6)
+    activemodel (7.0.8.7)
+      activesupport (= 7.0.8.7)
+    activerecord (7.0.8.7)
+      activemodel (= 7.0.8.7)
+      activesupport (= 7.0.8.7)
+    activesupport (7.0.8.7)
       concurrent-ruby (~> 1.0, >= 1.0.2)
       i18n (>= 1.6, < 2)
       minitest (>= 5.1)
@@ -156,8 +172,8 @@ GEM
       require_all (>= 2, < 4)
       rspec-expectations (~> 3.12)
       uuid (>= 2.3, < 3)
-    arel-helpers (2.15.0)
-      activerecord (>= 3.1.0, < 8)
+    arel-helpers (2.16.0)
+      activerecord (>= 3.1.0, < 8.1)
     ast (2.4.2)
     aws-eventstream (1.3.0)
     aws-partitions (1.999.0)
@@ -227,7 +243,7 @@ GEM
     em-socksify (0.3.3)
       base64
       eventmachine (>= 1.0.0.beta.4)
-    erubi (1.13.0)
+    erubi (1.13.1)
     eventmachine (1.2.7)
     factory_bot (6.5.0)
       activesupport (>= 5.0.0)
@@ -265,7 +281,7 @@ GEM
       domain_name (~> 0.5)
     http_parser.rb (0.8.0)
     httpclient (2.8.3)
-    i18n (1.14.6)
+    i18n (1.14.7)
       concurrent-ruby (~> 1.0)
     io-console (0.7.2)
     irb (1.7.4)
@@ -280,7 +296,7 @@ GEM
     logging (2.4.0)
       little-plugger (~> 1.1)
       multi_json (~> 1.14)
-    loofah (2.23.1)
+    loofah (2.24.0)
       crass (~> 1.0.2)
       nokogiri (>= 1.12.0)
     macaddr (1.7.2)
@@ -307,16 +323,6 @@ GEM
       activesupport (~> 7.0)
       railties (~> 7.0)
     metasploit-payloads (2.0.189)
-    metasploit_data_models (6.0.5)
-      activerecord (~> 7.0)
-      activesupport (~> 7.0)
-      arel-helpers
-      metasploit-concern
-      metasploit-model (>= 3.1)
-      pg
-      railties (~> 7.0)
-      recog
-      webrick
     metasploit_payloads-mettle (1.0.35)
     method_source (1.1.0)
     mime-types (3.6.0)
@@ -324,7 +330,7 @@ GEM
       mime-types-data (~> 3.2015)
     mime-types-data (3.2024.1001)
     mini_portile2 (2.8.8)
-    minitest (5.25.1)
+    minitest (5.25.4)
     mqtt (0.6.0)
     msgpack (1.6.1)
     multi_json (1.15.0)
@@ -383,22 +389,22 @@ GEM
     puma (6.4.3)
       nio4r (~> 2.0)
     racc (1.8.1)
-    rack (2.2.10)
+    rack (2.2.11)
     rack-protection (3.2.0)
       base64 (>= 0.1.0)
       rack (~> 2.2, >= 2.2.4)
-    rack-test (2.1.0)
+    rack-test (2.2.0)
       rack (>= 1.3)
     rails-dom-testing (2.2.0)
       activesupport (>= 5.0.0)
       minitest
       nokogiri (>= 1.6)
-    rails-html-sanitizer (1.6.0)
+    rails-html-sanitizer (1.6.2)
       loofah (~> 2.21)
-      nokogiri (~> 1.14)
-    railties (7.0.8.6)
-      actionpack (= 7.0.8.6)
-      activesupport (= 7.0.8.6)
+      nokogiri (>= 1.15.7, != 1.16.7, != 1.16.6, != 1.16.5, != 1.16.4, != 1.16.3, != 1.16.2, != 1.16.1, != 1.16.0.rc1, != 1.16.0)
+    railties (7.0.8.7)
+      actionpack (= 7.0.8.7)
+      activesupport (= 7.0.8.7)
       method_source
       rake (>= 12.2)
       thor (~> 1.0)
@@ -408,7 +414,7 @@ GEM
     rasn1 (0.13.0)
       strptime (~> 0.2.5)
     rb-readline (0.5.5)
-    recog (3.1.11)
+    recog (3.1.13)
       nokogiri
     redcarpet (3.6.0)
     regexp_parser (2.9.2)
@@ -556,7 +562,7 @@ GEM
       macaddr (~> 1.0)
     warden (1.2.9)
       rack (>= 2.0.9)
-    webrick (1.8.2)
+    webrick (1.9.1)
     websocket-driver (0.7.6)
       websocket-extensions (>= 0.1.0)
     websocket-extensions (0.1.5)
@@ -578,7 +584,7 @@ GEM
     xmlrpc (0.3.3)
       webrick
     yard (0.9.37)
-    zeitwerk (2.6.18)
+    zeitwerk (2.7.1)
 
 PLATFORMS
   ruby
@@ -590,6 +596,7 @@ DEPENDENCIES
   fivemat
   memory_profiler
   metasploit-framework!
+  metasploit_data_models!
   octokit
   pry-byebug
   rake

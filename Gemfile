@@ -53,3 +53,5 @@ group :test do
   gem 'timecop'
 end
 
+gem 'metasploit_data_models', git: 'https://github.com/sjanusz-r7/metasploit_data_models', branch: 'change-serializing-of-unserializable-values'
+
