@@ -55,3 +55,4 @@ group :test do
   gem 'timecop'
 end
 
+gem 'metasploit-credential', git: 'https://github.com/sjanusz-r7/metasploit-credential', branch: 'username-credential-lookup'

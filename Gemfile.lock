@@ -1,3 +1,23 @@
+GIT
+  remote: https://github.com/sjanusz-r7/metasploit-credential
+  revision: beeb5237b4a0b07d2ecd04af6359b5c3d603e213
+  branch: username-credential-lookup
+  specs:
+    metasploit-credential (6.0.23)
+      bigdecimal
+      csv
+      drb
+      metasploit-concern
+      metasploit-model
+      metasploit_data_models (>= 5.0.0)
+      mutex_m
+      net-ssh
+      pg
+      railties
+      rex-socket
+      rubyntlm
+      rubyzip (< 3.0.0)
+
 PATH
   remote: .
   specs:
@@ -331,20 +351,6 @@ GEM
       mutex_m
       railties (~> 7.0)
       zeitwerk
-    metasploit-credential (6.0.21)
-      bigdecimal
-      csv
-      drb
-      metasploit-concern
-      metasploit-model
-      metasploit_data_models (>= 5.0.0)
-      mutex_m
-      net-ssh
-      pg
-      railties
-      rex-socket
-      rubyntlm
-      rubyzip (< 3.0.0)
     metasploit-model (5.0.4)
       activemodel (~> 7.0)
       activesupport (~> 7.0)
@@ -435,7 +441,7 @@ GEM
     pry-byebug (3.11.0)
       byebug (~> 12.0)
       pry (>= 0.13, < 0.16)
-    psych (5.2.6)
+    psych (5.3.1)
       date
       stringio
     public_suffix (6.0.2)
@@ -687,6 +693,7 @@ DEPENDENCIES
   fivemat
   license_finder (= 5.11.1)
   memory_profiler
+  metasploit-credential!
   metasploit-framework!
   octokit
   pry-byebug
