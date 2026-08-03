@@ -15,11 +15,15 @@ module Msf::MCP
       # @param port [Integer] Metasploit RPC port
       # @param endpoint [String] API endpoint path (default: DEFAULT_ENDPOINT)
       # @param ssl [Boolean] Use SSL (default: true)
-      def initialize(host:, port:, endpoint: DEFAULT_ENDPOINT, ssl: true)
+      # @param token [String, nil] Pre-shared RPC token. When supplied the client
+      #   is considered authenticated and skips +auth.login+. This supports
+      #   servers that use permanent token authentication (e.g. Metasploit Pro's
+      #   prosvc service key) rather than username/password credentials.
+      def initialize(host:, port:, endpoint: DEFAULT_ENDPOINT, ssl: true, token: nil)
         @host = host
         @port = port
         @endpoint = endpoint
-        @token = nil
+        @token = token
         @http = nil
         @user = nil
         @password = nil
@@ -71,7 +75,6 @@ module Msf::MCP
 
           # Send HTTP request
           send_request(request_array)
-
         rescue AuthenticationError => e
           # It is not possible to reauthenticate if we don't have credentials stored
           raise unless @user && @password
@@ -99,7 +102,6 @@ module Msf::MCP
           # Retry the original request with new token
           retry
         end
-
       rescue Msf::MCP::Error => e
         elog({ message: 'MessagePack API call error', context: { error: e.message } },
             LOG_SOURCE, LOG_ERROR)

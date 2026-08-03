@@ -5,9 +5,10 @@ module Msf::MCP
     ##
     # Rack middleware that enforces Bearer token authentication on every request.
     #
-    # Skipped (pass-through) when no token is configured -- the token is always
-    # present when this middleware is mounted because {Server#start_http} only
-    # adds it to the stack when +auth_token+ is non-nil.
+    # The configured token may be a static String or a callable (resolved per
+    # request). A callable lets embedders change the token at runtime without
+    # rebuilding the Rack stack (e.g. Metasploit Pro reading it from settings).
+    # When the resolved token is blank, authentication is disabled (pass-through).
     #
     # Clients must send:
     #   Authorization: Bearer <token>
@@ -26,17 +27,35 @@ module Msf::MCP
         ['{"error":"Unauthorized"}']
       ].freeze
 
+      # @param app [#call] the downstream Rack app
+      # @param auth_token [String, #call, nil] a static token or a callable
+      #   returning the current token
       def initialize(app, auth_token:)
         @app        = app
         @auth_token = auth_token
       end
 
       def call(env)
-        expected = "Bearer #{@auth_token}"
+        token = current_token
+        # No token configured -> authentication disabled; pass through.
+        return @app.call(env) if token.empty?
+
+        expected = "Bearer #{token}"
         provided = env['HTTP_AUTHORIZATION'].to_s
         return UNAUTHORIZED unless Rack::Utils.secure_compare(expected, provided)
 
         @app.call(env)
+      end
+
+      private
+
+      # Resolve the configured token for the current request. Supports a static
+      # String or a callable so the token can change without rebuilding the stack.
+      #
+      # @return [String]
+      def current_token
+        value = @auth_token.respond_to?(:call) ? @auth_token.call : @auth_token
+        value.to_s
       end
     end
   end

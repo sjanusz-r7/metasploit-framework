@@ -82,6 +82,31 @@ RSpec.describe Msf::MCP::Tools::ToolHelper do
         tool_class.dangerous_mode_required!(dangerous_actions: 1)
       }.to raise_error(Msf::MCP::Tools::DangerousModeDisabledError)
     end
+
+    context 'when dangerous_actions is a callable (resolved per request)' do
+      it 'returns without raising when the callable resolves to true' do
+        expect {
+          tool_class.dangerous_mode_required!(dangerous_actions: -> { true })
+        }.not_to raise_error
+      end
+
+      it 'raises when the callable resolves to false' do
+        expect {
+          tool_class.dangerous_mode_required!(dangerous_actions: -> { false })
+        }.to raise_error(Msf::MCP::Tools::DangerousModeDisabledError)
+      end
+
+      it 'reflects the current value on each call' do
+        enabled = false
+        resolver = -> { enabled }
+        expect { tool_class.dangerous_mode_required!(dangerous_actions: resolver) }
+          .to raise_error(Msf::MCP::Tools::DangerousModeDisabledError)
+
+        enabled = true
+        expect { tool_class.dangerous_mode_required!(dangerous_actions: resolver) }
+          .not_to raise_error
+      end
+    end
   end
 
   describe '#with_tool_context' do

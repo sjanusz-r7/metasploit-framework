@@ -42,9 +42,24 @@ module Msf::MCP
       # @return [void]
       #
       def dangerous_mode_required!(server_context)
-        return if server_context[:dangerous_actions] == true
+        return if dangerous_actions_enabled?(server_context)
 
         raise DangerousModeDisabledError, DANGEROUS_MODE_DISABLED_MESSAGE
+      end
+
+      ##
+      # Resolve whether dangerous actions are currently enabled.
+      #
+      # The server context value may be a Boolean or a callable (resolved per
+      # request), so embedders can toggle the mode at runtime without rebuilding
+      # the server.
+      #
+      # @param server_context [Hash]
+      # @return [Boolean]
+      def dangerous_actions_enabled?(server_context)
+        value = server_context[:dangerous_actions]
+        value = value.call if value.respond_to?(:call)
+        value == true
       end
 
       ##

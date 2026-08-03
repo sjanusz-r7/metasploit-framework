@@ -23,6 +23,22 @@ RSpec.describe Msf::MCP::Metasploit::MessagePackClient do
       client_no_ssl = described_class.new(host: host, port: port, ssl: false)
       expect(client_no_ssl.instance_variable_get(:@ssl)).to eq(false)
     end
+
+    it 'stores a pre-shared token when provided' do
+      tokened = described_class.new(host: host, port: port, token: 'servicekey123')
+      expect(tokened.instance_variable_get(:@token)).to eq('servicekey123')
+    end
+  end
+
+  describe 'pre-shared token authentication' do
+    let(:client) { described_class.new(host: host, port: port, token: 'servicekey123') }
+
+    it 'issues API calls with the pre-shared token without calling auth.login' do
+      expect(client).to receive(:send_request)
+        .with(['session.list', 'servicekey123'])
+        .and_return({})
+      client.session_list
+    end
   end
 
   describe 'SSL configuration' do

@@ -108,6 +108,33 @@ RSpec.describe Msf::MCP::Server do
       )
     end
 
+    it 'registers extra_tools alongside the built-in tools' do
+      extra_tool = Class.new(::MCP::Tool)
+
+      expect(::MCP::Server).to receive(:new).with(
+        hash_including(
+          tools: array_including(Msf::MCP::Tools::SearchModules, extra_tool)
+        )
+      ).and_return(mock_mcp_server)
+
+      described_class.new(
+        msf_client: mock_msf_client,
+        rate_limiter: rate_limiter,
+        extra_tools: [extra_tool]
+      )
+    end
+
+    it 'registers only the built-in tools when no extra_tools are given' do
+      expect(::MCP::Server).to receive(:new).with(
+        hash_including(tools: Msf::MCP::Server::BUILTIN_TOOLS)
+      ).and_return(mock_mcp_server)
+
+      described_class.new(
+        msf_client: mock_msf_client,
+        rate_limiter: rate_limiter
+      )
+    end
+
     it 'creates server context with msf_client and rate_limiter' do
       expect(::MCP::Server).to receive(:new).with(
         hash_including(
@@ -727,6 +754,51 @@ RSpec.describe Msf::MCP::Server do
       it 'passes all requests through without authentication' do
         status, _headers, _body = call_rack
         expect(status).to eq(200)
+      end
+    end
+  end
+
+  describe '#rack_app' do
+    subject(:server) do
+      described_class.new(msf_client: mock_msf_client, rate_limiter: rate_limiter)
+    end
+
+    it 'returns a Rack application without starting a web server' do
+      expect(server.rack_app(auth_token: 'secret')).to respond_to(:call)
+    end
+
+    it 'returns a Rack application when no auth token is provided' do
+      expect(server.rack_app).to respond_to(:call)
+    end
+
+    it 'raises once the server has been shut down' do
+      server.shutdown
+      expect { server.rack_app }.to raise_error(Msf::MCP::Error)
+    end
+
+    context 'with a callable auth_token (resolved per request)' do
+      it 'passes the callable through to BearerAuth unchanged (not stringified)' do
+        require 'rack'
+        captured = nil
+        allow(Msf::MCP::Middleware::BearerAuth).to receive(:new).and_wrap_original do |orig, app, **kwargs|
+          captured = kwargs[:auth_token]
+          orig.call(app, **kwargs)
+        end
+
+        callable = -> { 'sekret' }
+        app = server.rack_app(auth_token: callable)
+
+        # A wrong token is rejected by BearerAuth before reaching the transport,
+        # which also triggers the Rack::Builder to instantiate the middleware.
+        # A body is supplied because the RequestLogger middleware reads it.
+        env = Rack::MockRequest.env_for('/', method: 'POST', input: '{"jsonrpc":"2.0"}')
+        env['HTTP_AUTHORIZATION'] = 'Bearer wrong'
+        expect(app.call(env)[0]).to eq(401)
+
+        # The middleware must have received the callable itself, so it can
+        # resolve the current token per request (regression: it used to receive
+        # auth_token.to_s, i.e. the stringified Proc, which never matched).
+        expect(captured).to be(callable)
       end
     end
   end

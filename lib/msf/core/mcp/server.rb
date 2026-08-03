@@ -19,14 +19,39 @@ module Msf::MCP
     PUMA_MAX_THREADS = 5
     PUMA_WORKERS = 0
 
+    # Built-in tools always registered with the server.
+    BUILTIN_TOOLS = [
+      Tools::SearchModules,
+      Tools::ModuleInfo,
+      Tools::ModuleExecute,
+      Tools::ModuleCheck,
+      Tools::ModuleResults,
+      Tools::RunningStats,
+      Tools::HostInfo,
+      Tools::ServiceInfo,
+      Tools::VulnerabilityInfo,
+      Tools::NoteInfo,
+      Tools::CredentialInfo,
+      Tools::LootInfo,
+      Tools::SessionList,
+      Tools::SessionStop,
+      Tools::SessionRead,
+      Tools::SessionWrite
+    ].freeze
+
     ##
     # Initialize the MCP server with required dependencies
     #
     # @param msf_client [Metasploit::Client] Configured and authenticated Metasploit client
     # @param rate_limiter [Security::RateLimiter] Configured rate limiter
-    # @param dangerous_actions [Boolean] Whether dangerous (destructive) tools are permitted
+    # @param dangerous_actions [Boolean, #call] Whether dangerous (destructive)
+    #   tools are permitted. May be a Boolean, or a callable resolved per request
+    #   so the mode can be toggled at runtime without rebuilding the server.
+    # @param extra_tools [Array<Class>] Additional ::MCP::Tool subclasses to register
+    #   alongside the built-in tools. Lets embedders (e.g. Metasploit Pro) expose
+    #   deployment-specific tools without modifying Framework.
     #
-    def initialize(msf_client:, rate_limiter:, dangerous_actions: false)
+    def initialize(msf_client:, rate_limiter:, dangerous_actions: false, extra_tools: [])
       @msf_client = msf_client
 
       # Create server context (passed to all tool calls)
@@ -34,7 +59,9 @@ module Msf::MCP
       @server_context = {
         msf_client: @msf_client,
         rate_limiter: rate_limiter,
-        dangerous_actions: dangerous_actions == true
+        # A Boolean, or a callable resolved per request (see ToolHelper). A
+        # callable lets embedders toggle the mode at runtime without rebuilding.
+        dangerous_actions: dangerous_actions.respond_to?(:call) ? dangerous_actions : (dangerous_actions == true)
       }
 
       # Create MCP configuration with request lifecycle callbacks
@@ -46,24 +73,7 @@ module Msf::MCP
       @mcp_server = ::MCP::Server.new(
         name: 'msfmcp',
         version: Msf::MCP::Application::VERSION,
-        tools: [
-          Tools::SearchModules,
-          Tools::ModuleInfo,
-          Tools::ModuleExecute,
-          Tools::ModuleCheck,
-          Tools::ModuleResults,
-          Tools::RunningStats,
-          Tools::HostInfo,
-          Tools::ServiceInfo,
-          Tools::VulnerabilityInfo,
-          Tools::NoteInfo,
-          Tools::CredentialInfo,
-          Tools::LootInfo,
-          Tools::SessionList,
-          Tools::SessionStop,
-          Tools::SessionRead,
-          Tools::SessionWrite
-        ],
+        tools: BUILTIN_TOOLS + Array(extra_tools),
         server_context: @server_context,
         configuration: mcp_config
       )
@@ -90,6 +100,38 @@ module Msf::MCP
         start_http(host, port, auth_token, min_threads: min_threads, max_threads: max_threads, workers: workers)
       else
         raise ArgumentError, "Unknown transport: #{transport}. Use :stdio or :http"
+      end
+    end
+
+    ##
+    # Build the Rack application for the MCP HTTP transport (StreamableHTTP,
+    # wrapped with request logging and optional bearer auth) WITHOUT starting a
+    # web server.
+    #
+    # This lets the MCP endpoint be mounted into an existing Rack stack — e.g.
+    # Metasploit Pro mounting it under +/mcp+ in the Rails Puma via +config.ru+
+    # with +Rack::Builder#map+ — instead of (or in addition to) running its own
+    # Puma via {#start}. The transport itself is a Rack app (implements +#call+).
+    #
+    # @param auth_token [String, #call, nil] bearer token to require. May be a
+    #   static String or a callable resolved per request (BearerAuth handles
+    #   both). When nil or an empty String, authentication is disabled.
+    # @return [#call] a Rack application
+    # @raise [Msf::MCP::Error] if the server has been shut down / not initialized
+    def rack_app(auth_token: nil)
+      require 'rack'
+      raise Msf::MCP::Error, 'MCP server is not initialized' unless @mcp_server
+
+      transport = ::MCP::Server::Transports::StreamableHTTPTransport.new(@mcp_server)
+      # Pass the token through unchanged (do NOT call #to_s): BearerAuth resolves
+      # it per request, so a callable must reach the middleware intact. Only skip
+      # auth when it is nil or an explicitly empty String.
+      auth_disabled = auth_token.nil? || (auth_token.respond_to?(:empty?) && auth_token.empty?)
+
+      Rack::Builder.new do
+        use Msf::MCP::Middleware::RequestLogger
+        use Msf::MCP::Middleware::BearerAuth, auth_token: auth_token unless auth_disabled
+        run transport
       end
     end
 
@@ -155,15 +197,9 @@ module Msf::MCP
       # Guard against shutdown racing with startup
       raise Msf::MCP::Error, 'MCP server was shut down before HTTP transport could start' unless @mcp_server
 
-      transport = ::MCP::Server::Transports::StreamableHTTPTransport.new(@mcp_server)
-
-      # Build the Rack application with logging middleware.
-      # The transport itself is a Rack app (implements #call).
-      rack_app = Rack::Builder.new do
-        use Msf::MCP::Middleware::RequestLogger
-        use Msf::MCP::Middleware::BearerAuth, auth_token: auth_token.to_s if auth_token && !auth_token.to_s.empty?
-        run transport
-      end
+      # Compose the Rack app (transport + logging + optional bearer auth) via the
+      # shared builder so mounted and self-hosted modes stay identical.
+      app = rack_app(auth_token: auth_token)
 
       # Use Puma's server API directly so we can stop it gracefully on shutdown.
       bind_host = host.include?(':') ? "[#{host}]" : host
@@ -180,13 +216,13 @@ module Msf::MCP
             config.threads min_threads, max_threads
             config.workers workers
             config.log_requests false
-            config.app rack_app
+            config.app app
           end
 
           @puma_launcher = Puma::Launcher.new(puma_config, log_writer: log_writer)
           @puma_launcher.run
         else
-          @puma_server = Puma::Server.new(rack_app, nil, {
+          @puma_server = Puma::Server.new(app, nil, {
             log_writer: log_writer,
             min_threads: min_threads,
             max_threads: max_threads

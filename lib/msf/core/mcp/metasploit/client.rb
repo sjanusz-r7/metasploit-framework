@@ -12,7 +12,10 @@ module Msf::MCP
       def_delegators :@client, :authenticate, :search_modules, :module_info,
                      :db_hosts, :db_services, :db_vulns, :db_notes, :db_creds, :db_loot,
                      :module_execute, :module_check, :module_results, :running_stats,
-                     :session_list, :session_stop, :session_read, :session_write, :shutdown
+                     :session_list, :session_stop, :session_read, :session_write, :shutdown,
+                     # Generic RPC passthrough so embedders can call methods that
+                     # have no dedicated helper (e.g. Metasploit Pro's pro.* group).
+                     :call_api
 
       ##
       # Initialize Metasploit client with explicit parameters
@@ -43,12 +46,16 @@ module Msf::MCP
         case api_type
         when 'messagepack'
           require_relative 'messagepack_client'
-          MessagePackClient.new(
+          messagepack_args = {
             host: host,
             port: port,
             endpoint: endpoint || MessagePackClient::DEFAULT_ENDPOINT,
             ssl: ssl
-          )
+          }
+          # Only forward a pre-shared token when one is provided so callers that
+          # authenticate via auth.login keep the existing behaviour.
+          messagepack_args[:token] = token unless token.nil?
+          MessagePackClient.new(**messagepack_args)
         when 'json-rpc'
           require_relative 'jsonrpc_client'
           JsonRpcClient.new(

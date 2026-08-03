@@ -74,10 +74,20 @@ module Msf::MCP
           log_post_exchange(request, response, context)
         when 'GET'
           context[:response] = build_response_context(response)
-          ilog({ message: "SSE stream opened (#{elapsed_ms}ms)", context: context }, LOG_SOURCE, LOG_INFO)
+          if status >= 400
+            # The stream was never opened -- the request was rejected (e.g. 401
+            # from bearer auth). Log at DEBUG so retry loops don't flood the viewer.
+            dlog({ message: "SSE stream rejected: HTTP #{status} (#{elapsed_ms}ms)", context: context }, LOG_SOURCE, LOG_DEBUG)
+          else
+            ilog({ message: "SSE stream opened (#{elapsed_ms}ms)", context: context }, LOG_SOURCE, LOG_INFO)
+          end
         when 'DELETE'
           context[:response] = build_response_context(response)
-          ilog({ message: "Session deleted (#{elapsed_ms}ms)", context: context }, LOG_SOURCE, LOG_INFO)
+          if status >= 400
+            dlog({ message: "Session delete rejected: HTTP #{status} (#{elapsed_ms}ms)", context: context }, LOG_SOURCE, LOG_DEBUG)
+          else
+            ilog({ message: "Session deleted (#{elapsed_ms}ms)", context: context }, LOG_SOURCE, LOG_INFO)
+          end
         else
           context[:response] = build_response_context(response)
           dlog({ message: "HTTP #{request.request_method} #{status} (#{elapsed_ms}ms)", context: context }, LOG_SOURCE, LOG_DEBUG)

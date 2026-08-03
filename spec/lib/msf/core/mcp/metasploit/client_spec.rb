@@ -47,6 +47,24 @@ RSpec.describe Msf::MCP::Metasploit::Client do
 
       expect(client.instance_variable_get(:@client)).to eq(messagepack_client)
     end
+
+    it 'forwards a pre-shared token to MessagePackClient when provided' do
+      expect(Msf::MCP::Metasploit::MessagePackClient).to receive(:new).with(
+        host: 'localhost',
+        port: 55553,
+        ssl: true,
+        endpoint: '/api/',
+        token: 'servicekey123'
+      ).and_return(messagepack_client)
+
+      described_class.new(
+        api_type: 'messagepack',
+        host: 'localhost',
+        port: 55553,
+        ssl: true,
+        token: 'servicekey123'
+      )
+    end
   end
 
   describe '#initialize with invalid API type' do
@@ -128,6 +146,11 @@ RSpec.describe Msf::MCP::Metasploit::Client do
     it 'delegates search_modules to underlying client' do
       allow(jsonrpc_client).to receive(:search_modules).with('smb').and_return(['module1'])
       expect(client.search_modules('smb')).to eq(['module1'])
+    end
+
+    it 'delegates call_api to underlying client' do
+      allow(jsonrpc_client).to receive(:call_api).with('pro.projects', []).and_return({ 'default' => {} })
+      expect(client.call_api('pro.projects', [])).to eq({ 'default' => {} })
     end
 
     it 'delegates authenticate to underlying client' do
