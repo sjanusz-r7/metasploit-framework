@@ -6,7 +6,7 @@ module Msf::MCP
     # Rack middleware that logs MCP HTTP request/response details via Rex logging.
     #
     # Focuses on the HTTP transport layer: request method, status code, session ID,
-    # content type, and round-trip timing.  For POST requests it also extracts
+    # caller IP, content type, and round-trip timing.  For POST requests it also extracts
     # JSON-RPC fields (method, id, params) and response result/error to provide
     # DEBUG-level visibility into the exchange.
     #
@@ -68,6 +68,8 @@ module Msf::MCP
 
         context = { elapsed_ms: elapsed_ms }
         context[:session_id] = session_id if session_id
+        client_ip = request.ip
+        context[:client_ip] = client_ip if client_ip
 
         case request.request_method
         when 'POST'

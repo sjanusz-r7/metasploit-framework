@@ -286,6 +286,25 @@ RSpec.describe Msf::MCP::Middleware::RequestLogger do
     end
   end
 
+  describe 'caller IP extraction' do
+    it 'includes client_ip from the request in context' do
+      body = '{"jsonrpc":"2.0","method":"ping","id":1}'
+      env = rack_env_for('POST', body: body)
+      env['REMOTE_ADDR'] = '192.0.2.10'
+      middleware.call(env)
+
+      expect(last_log_entry['context']['client_ip']).to eq('192.0.2.10')
+    end
+
+    it 'includes client_ip for GET (SSE) requests' do
+      env = rack_env_for('GET')
+      env['REMOTE_ADDR'] = '192.0.2.20'
+      middleware.call(env)
+
+      expect(last_log_entry['context']['client_ip']).to eq('192.0.2.20')
+    end
+  end
+
   describe 'content type in response context' do
     it 'includes Content-Type when present' do
       env = rack_env_for('GET')
