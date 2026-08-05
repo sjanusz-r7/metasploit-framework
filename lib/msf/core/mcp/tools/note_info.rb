@@ -33,7 +33,7 @@ module Msf::MCP
           },
           ports: {
             type: 'string',
-            description: 'Port number or range to filter (e.g., "80" or "80-443")'
+            description: 'Port(s) to filter: a single port, a range, or a comma-separated list (e.g., "80", "80-443", or "21,22,80-90")'
           },
           protocol: {
             type: 'string',

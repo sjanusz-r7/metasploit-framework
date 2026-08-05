@@ -267,7 +267,45 @@ RSpec.describe Msf::MCP::Security::InputValidator do
       it 'rejects "abc-def"' do
         expect {
           described_class.validate_port_range!('abc-def')
-        }.to raise_error(Msf::MCP::Security::ValidationError, 'Port range must have integer bounds: abc-def')
+        }.to raise_error(Msf::MCP::Security::ValidationError, 'Port must be an integer: "abc-def"')
+      end
+    end
+
+    context 'with comma-separated port specifications' do
+      it 'accepts a list of single ports' do
+        expect(described_class.validate_port_range!('21,22,445')).to be true
+      end
+
+      it 'accepts a mix of single ports and ranges' do
+        expect(described_class.validate_port_range!('21,22,80-90,443')).to be true
+      end
+
+      it 'tolerates whitespace around tokens' do
+        expect(described_class.validate_port_range!('21, 22 , 80-90')).to be true
+      end
+
+      it 'rejects the list when any single port is out of range' do
+        expect {
+          described_class.validate_port_range!('22,70000')
+        }.to raise_error(Msf::MCP::Security::ValidationError, 'Port must be between 1 and 65535: 70000')
+      end
+
+      it 'rejects the list when any range is out of range' do
+        expect {
+          described_class.validate_port_range!('22,1-70000')
+        }.to raise_error(Msf::MCP::Security::ValidationError, 'Port range must be between 1 and 65535: 1..70000')
+      end
+
+      it 'rejects an empty token from a trailing comma' do
+        expect {
+          described_class.validate_port_range!('80,')
+        }.to raise_error(Msf::MCP::Security::ValidationError, 'Invalid port specification: "80,"')
+      end
+
+      it 'rejects an empty token between commas' do
+        expect {
+          described_class.validate_port_range!('80,,443')
+        }.to raise_error(Msf::MCP::Security::ValidationError, 'Invalid port specification: "80,,443"')
       end
     end
 

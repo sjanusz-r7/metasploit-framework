@@ -33,7 +33,7 @@ module Msf::MCP
           },
           ports: {
             type: 'string',
-            description: 'Port number or range to filter (e.g., "80" or "80-443")'
+            description: 'Port(s) to filter: a single port, a range, or a comma-separated list (e.g., "80", "80-443", or "21,22,80-90")'
           },
           protocol: {
             type: 'string',
@@ -110,7 +110,7 @@ module Msf::MCP
         #
         # @param workspace [String] Workspace name (default: 'default')
         # @param names [String, nil] Comma-separated service names to filter
-        # @param ports [String, nil] Port number or range to filter
+        # @param ports [String, nil] Port specification: single port, range, or comma-separated list
         # @param host [String, nil] Host IP address
         # @param protocol [String, nil] Protocol to filter (tcp or udp)
         # @param only_up [Boolean] Filter to only return services on hosts that are up

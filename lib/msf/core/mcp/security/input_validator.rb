@@ -93,26 +93,39 @@ module Msf::MCP
         end
       end
 
-      # Validate port or port range
+      # Validate a port specification.
       #
-      # @param range [String, Integer] Port number or range (e.g., "80" or "80-443")
+      # Accepts the same comma-separated portspec the database layer parses via
+      # Rex::Socket.portspec_to_portlist: a single port ("80"), a range
+      # ("80-443"), or any comma-separated combination of the two
+      # ("21,22,80-90"). Whitespace around tokens is tolerated. Every numeric
+      # bound must fall within 1..65535.
+      #
+      # @param spec [String, Integer] Port specification
       # @return [true] If valid
       # @raise [ValidationError] If invalid
-      def self.validate_port_range!(range)
-        return true if range.nil? || range.to_s.empty?
+      def self.validate_port_range!(spec)
+        return true if spec.nil? || spec.to_s.strip.empty?
 
-        range_str = range.to_s
+        spec_str = spec.to_s
 
-        # Match a port range like "80-443" — requires digits on both sides of the dash
-        if range_str.match?(/\A\s*[[:alnum:]]+-[[:alnum:]]+\s*\z/)
-          begin
-            start_port, end_port = range_str.split('-', 2).map { |p| Integer(p.strip) }
-          rescue TypeError, ArgumentError
-            raise ValidationError, "Port range must have integer bounds: #{range_str}"
+        # split(-1) keeps trailing empty fields so "80," / ",80" / "80,,443"
+        # are rejected rather than silently accepted.
+        tokens = spec_str.split(',', -1).map(&:strip)
+        if tokens.empty? || tokens.any?(&:empty?)
+          raise ValidationError, "Invalid port specification: #{spec_str.inspect}"
+        end
+
+        tokens.each do |token|
+          if token.match?(/\A\d+-\d+\z/)
+            start_port, end_port = token.split('-', 2).map { |p| Integer(p, 10) }
+            validate_parameter!('Port range', start_port..end_port, 1..65535)
+          else
+            # Single port, or a malformed token. Delegate to validate_parameter!,
+            # which performs Integer() coercion and range checking and yields the
+            # existing "must be an integer" / "must be between" error messages.
+            validate_parameter!('Port', token, 1..65535)
           end
-          validate_parameter!('Port range', start_port..end_port, 1..65535)
-        else
-          validate_parameter!('Port', range_str, 1..65535)
         end
 
         true
