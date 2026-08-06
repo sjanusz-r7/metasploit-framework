@@ -96,27 +96,19 @@ RSpec.describe Msf::MCP::Middleware::BearerAuth do
       end
     end
 
-    context 'with a callable token (resolved per request)' do
-      it 'authorizes against the currently resolved token' do
-        current = 's3cr3t'
-        mw = described_class.new(inner_app, auth_token: -> { current })
-        expect(mw.call(rack_env_for(authorization: "Bearer #{current}"))[0]).to eq(200)
-      end
+    context 'when the token is an empty string' do
+      let(:middleware) { described_class.new(inner_app, auth_token: '') }
 
-      it 'reflects a changed token without rebuilding the middleware' do
-        current = 's3cr3t'
-        mw = described_class.new(inner_app, auth_token: -> { current })
-
-        expect(mw.call(rack_env_for(authorization: 'Bearer s3cr3t'))[0]).to eq(200)
-
-        current = 'rotated'
-        expect(mw.call(rack_env_for(authorization: 'Bearer s3cr3t'))[0]).to eq(401)
-        expect(mw.call(rack_env_for(authorization: 'Bearer rotated'))[0]).to eq(200)
+      it 'disables authentication and passes through' do
+        env = rack_env_for
+        status, _headers, body = middleware.call(env)
+        expect(status).to eq(200)
+        expect(body).to eq(['OK'])
       end
     end
 
-    context 'when the resolved token is blank' do
-      let(:middleware) { described_class.new(inner_app, auth_token: -> { '' }) }
+    context 'when the token is nil' do
+      let(:middleware) { described_class.new(inner_app, auth_token: nil) }
 
       it 'disables authentication and passes through' do
         env = rack_env_for

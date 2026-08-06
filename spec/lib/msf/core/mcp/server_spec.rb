@@ -776,8 +776,8 @@ RSpec.describe Msf::MCP::Server do
       expect { server.rack_app }.to raise_error(Msf::MCP::Error)
     end
 
-    context 'with a callable auth_token (resolved per request)' do
-      it 'passes the callable through to BearerAuth unchanged (not stringified)' do
+    context 'with a String auth_token' do
+      it 'passes the token through to BearerAuth' do
         require 'rack'
         captured = nil
         allow(Msf::MCP::Middleware::BearerAuth).to receive(:new).and_wrap_original do |orig, app, **kwargs|
@@ -785,8 +785,7 @@ RSpec.describe Msf::MCP::Server do
           orig.call(app, **kwargs)
         end
 
-        callable = -> { 'sekret' }
-        app = server.rack_app(auth_token: callable)
+        app = server.rack_app(auth_token: 'sekret')
 
         # A wrong token is rejected by BearerAuth before reaching the transport,
         # which also triggers the Rack::Builder to instantiate the middleware.
@@ -795,10 +794,7 @@ RSpec.describe Msf::MCP::Server do
         env['HTTP_AUTHORIZATION'] = 'Bearer wrong'
         expect(app.call(env)[0]).to eq(401)
 
-        # The middleware must have received the callable itself, so it can
-        # resolve the current token per request (regression: it used to receive
-        # auth_token.to_s, i.e. the stringified Proc, which never matched).
-        expect(captured).to be(callable)
+        expect(captured).to eq('sekret')
       end
     end
   end

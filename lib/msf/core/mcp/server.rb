@@ -44,9 +44,8 @@ module Msf::MCP
     #
     # @param msf_client [Metasploit::Client] Configured and authenticated Metasploit client
     # @param rate_limiter [Security::RateLimiter] Configured rate limiter
-    # @param dangerous_actions [Boolean, #call] Whether dangerous (destructive)
-    #   tools are permitted. May be a Boolean, or a callable resolved per request
-    #   so the mode can be toggled at runtime without rebuilding the server.
+    # @param dangerous_actions [Boolean] Whether dangerous (destructive) tools
+    #   are permitted.
     # @param extra_tools [Array<Class>] Additional ::MCP::Tool subclasses to register
     #   alongside the built-in tools. Lets embedders (e.g. Metasploit Pro) expose
     #   deployment-specific tools without modifying Framework.
@@ -59,9 +58,7 @@ module Msf::MCP
       @server_context = {
         msf_client: @msf_client,
         rate_limiter: rate_limiter,
-        # A Boolean, or a callable resolved per request (see ToolHelper). A
-        # callable lets embedders toggle the mode at runtime without rebuilding.
-        dangerous_actions: dangerous_actions.respond_to?(:call) ? dangerous_actions : (dangerous_actions == true)
+        dangerous_actions: dangerous_actions == true
       }
 
       # Create MCP configuration with request lifecycle callbacks
@@ -113,9 +110,8 @@ module Msf::MCP
     # with +Rack::Builder#map+ — instead of (or in addition to) running its own
     # Puma via {#start}. The transport itself is a Rack app (implements +#call+).
     #
-    # @param auth_token [String, #call, nil] bearer token to require. May be a
-    #   static String or a callable resolved per request (BearerAuth handles
-    #   both). When nil or an empty String, authentication is disabled.
+    # @param auth_token [String, nil] bearer token to require. When nil or an
+    #   empty String, authentication is disabled.
     # @return [#call] a Rack application
     # @raise [Msf::MCP::Error] if the server has been shut down / not initialized
     def rack_app(auth_token: nil)
@@ -123,10 +119,8 @@ module Msf::MCP
       raise Msf::MCP::Error, 'MCP server is not initialized' unless @mcp_server
 
       transport = ::MCP::Server::Transports::StreamableHTTPTransport.new(@mcp_server)
-      # Pass the token through unchanged (do NOT call #to_s): BearerAuth resolves
-      # it per request, so a callable must reach the middleware intact. Only skip
-      # auth when it is nil or an explicitly empty String.
-      auth_disabled = auth_token.nil? || (auth_token.respond_to?(:empty?) && auth_token.empty?)
+      # Skip auth when the token is nil or an empty String.
+      auth_disabled = auth_token.nil? || auth_token.empty?
 
       Rack::Builder.new do
         use Msf::MCP::Middleware::RequestLogger
