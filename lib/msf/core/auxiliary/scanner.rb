@@ -137,6 +137,12 @@ def run
           rescue ::Rex::ConnectionError, ::Rex::ConnectionProxyError, ::Errno::ECONNRESET, ::Errno::EINTR, ::Rex::TimeoutError, ::Timeout::Error, ::EOFError
           rescue ::Interrupt,::NoMethodError, ::RuntimeError, ::ArgumentError, ::NameError
             raise $!
+          rescue ::OpenSSL::SSL::SSLError => e
+            # Usually means the target is listening with plain HTTP on this port
+            # rather than SSL/TLS. Print a concise, actionable message and keep
+            # the full OpenSSL detail (backtrace at LogLevel 3) in framework.log.
+            nmod.print_error("SSL/TLS connection to #{targ} failed. The target may not be using SSL on this port; try setting SSL to false or correcting RPORT.")
+            elog("SSL/TLS connection failed running against host #{targ}", error: e)
           rescue ::Exception => e
             print_status("Error: #{targ}: #{e.class} #{e.message}")
             elog("Error running against host #{targ}", error: e)
@@ -226,6 +232,12 @@ def run
             rescue ::Rex::ConnectionError, ::Rex::ConnectionProxyError, ::Errno::ECONNRESET, ::Errno::EINTR, ::Rex::TimeoutError, ::Timeout::Error
             rescue ::Interrupt,::NoMethodError, ::RuntimeError, ::ArgumentError, ::NameError
               raise $!
+            rescue ::OpenSSL::SSL::SSLError => e
+              # Usually means the target is listening with plain HTTP on this port
+              # rather than SSL/TLS. Print a concise, actionable message and keep
+              # the full OpenSSL detail (backtrace at LogLevel 3) in framework.log.
+              print_error("SSL/TLS connection to #{mybatch[0]}-#{mybatch[-1]} failed. The target may not be using SSL on this port; try setting SSL to false or correcting RPORT.")
+              elog("SSL/TLS connection failed running against batch #{mybatch[0]}-#{mybatch[-1]}", error: e)
             rescue ::Exception => e
               print_status("Error: #{mybatch[0]}-#{mybatch[-1]}: #{e}")
             ensure

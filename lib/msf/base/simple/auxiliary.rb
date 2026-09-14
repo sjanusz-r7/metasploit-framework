@@ -232,6 +232,20 @@ protected
       mod.fail_reason = Msf::Module::Failure::BadConfig
       mod.fail_detail ||= e.to_s
       ::Msf::Ui::Formatter::OptionValidateError.print_error(mod, e)
+    rescue ::OpenSSL::SSL::SSLError => e
+      puts 'we are here'
+      # This can happen when we try to connect with SSL=true to software not running ssl, such as stuff usually on port 80.
+      mod.error = e
+      mod.fail_reason = Msf::Module::Failure::Unreachable
+      # The error message here can be something like:
+      # SSL_connect returned=1 errno=0 peeraddr=X.X.X.X:80 state=SSLv3/TLS write client hello: wrong version number
+      # which is not very informative to the end user. Preface it with something that feels better and more actionable for the user.
+      mod.fail_detail ||= "SSL/TLS connection failed. The target may not be using SSL on this port. Try running with SSL=false. (#{e})"
+      mod.print_error(mod.fail_detail)
+
+      elog("Auxiliary SSL/TLS connection failed (#{mod.refname})", error: e)
+      mod.cleanup if mod.respond_to?(:needs_cleanup) && mod.needs_cleanup
+      return
     rescue ::Exception => e
       mod.error = e
       mod.fail_reason = Msf::Module::Failure::Unknown
