@@ -184,6 +184,30 @@ RSpec.shared_examples_for 'Msf::DBManager::Cred' do
         expect(core.reload.private.data).to eq('newpassword')
       end
 
+      it 'attaches a realm when given via the :realm option' do
+        subject.update_credential(
+          id: core.id,
+          realm: { key: Metasploit::Model::Realm::Key::ACTIVE_DIRECTORY_DOMAIN, value: 'contoso.com' }
+        )
+
+        expect(core.reload.realm.value).to eq('contoso.com')
+      end
+
+      it 'updates the realm value when given via the :realm option with the credential\'s own realm id' do
+        realm = Metasploit::Credential::Realm.where(
+          key: Metasploit::Model::Realm::Key::ACTIVE_DIRECTORY_DOMAIN,
+          value: 'original.com'
+        ).first_or_create!
+        core.update!(realm: realm)
+
+        subject.update_credential(
+          id: core.id,
+          realm: { id: realm.id, key: Metasploit::Model::Realm::Key::ACTIVE_DIRECTORY_DOMAIN, value: 'updated.com' }
+        )
+
+        expect(core.reload.realm.value).to eq('updated.com')
+      end
+
       let(:other_core) do
         subject.create_credential(
           address: '192.0.2.2',
@@ -215,6 +239,21 @@ RSpec.shared_examples_for 'Msf::DBManager::Cred' do
         )
 
         expect(other_core.public.reload.username).to eq('someone-else')
+      end
+
+      it 'does not modify an unrelated credential\'s realm record when given a mismatched :realm id' do
+        other_realm = Metasploit::Credential::Realm.where(
+          key: Metasploit::Model::Realm::Key::ACTIVE_DIRECTORY_DOMAIN,
+          value: 'unrelated.com'
+        ).first_or_create!
+        other_core.update!(realm: other_realm)
+
+        subject.update_credential(
+          id: core.id,
+          realm: { id: other_realm.id, key: Metasploit::Model::Realm::Key::ACTIVE_DIRECTORY_DOMAIN, value: 'overwritten.com' }
+        )
+
+        expect(other_realm.reload.value).to eq('unrelated.com')
       end
     end
   end

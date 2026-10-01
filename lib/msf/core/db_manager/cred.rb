@@ -1,6 +1,6 @@
 module Msf::DBManager::Cred
   # List of allow-listed option keys, when performing operations on credentials. Only these can be modified by the caller.
-  PERMITTED_CORE_UPDATE_ATTRIBUTES = %i[workspace public private origin created_at updated_at].freeze
+  PERMITTED_CORE_UPDATE_ATTRIBUTES = %i[workspace public private origin realm created_at updated_at].freeze
 
   # Returns a copy of +opts+ containing only the keys in {PERMITTED_CORE_UPDATE_ATTRIBUTES}, to limit what values can be assigned/modified.
   #
@@ -287,6 +287,16 @@ module Msf::DBManager::Cred
           origin = Metasploit::Credential::Origin.where(opts[:origin].except(:id)).first_or_initialize
         end
         update_attrs[:origin] = origin
+      end
+      if opts[:realm]
+        # See comment above for :public -- same reasoning applies to :realm.
+        if opts[:realm][:id] && opts[:realm][:id].to_s == cred.realm_id.to_s
+          realm = Metasploit::Credential::Realm.find(opts[:realm][:id])
+          realm.update(opts[:realm].except(:id))
+        else
+          realm = Metasploit::Credential::Realm.where(opts[:realm].except(:id)).first_or_initialize
+        end
+        update_attrs[:realm] = realm
       end
 
       cred.update!(update_attrs)
