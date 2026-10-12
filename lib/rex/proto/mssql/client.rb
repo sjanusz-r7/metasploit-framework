@@ -107,6 +107,26 @@ module Rex
           return nsock
         end
 
+        # Closes the connection to the server.
+        #
+        # This overrides Metasploit::Framework::Tcp::Client#disconnect because
+        # +self.sock+ here is the channel's local socket pair end (lsock), not
+        # the real outbound socket. Closing only lsock would leave the real TCP
+        # socket to the SQL server, the rsock, and the channel's relay thread
+        # leaked. Tearing down the channel closes all of them. Safe to call more
+        # than once.
+        #
+        # @return [void]
+        def disconnect
+          if @mstds_channel
+            @mstds_channel.close
+            @mstds_channel = nil
+          end
+          self.sock = nil
+        end
+
+        alias close disconnect
+
         # MS SQL Server only supports Windows and Linux
         def map_compile_os_to_platform(server_info)
           return '' if server_info.blank?

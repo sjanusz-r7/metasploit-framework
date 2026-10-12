@@ -66,6 +66,7 @@ module Metasploit
               service_name: 'mssql'
           }
 
+          client = nil
           begin
             client = Rex::Proto::MSSQL::Client.new(framework_module, framework, host, port, proxies, sslkeylogfile: sslkeylogfile)
             if client.mssql_login(credential.public, credential.private, '', credential.realm)
@@ -73,8 +74,9 @@ module Metasploit
               if use_client_as_proof
                 result_options[:proof] = client
                 result_options[:connection] = client.sock
-              else
-                client.disconnect
+                # Ownership of the client (and its socket) is handed off to the
+                # caller as session proof; don't disconnect it in the ensure.
+                client = nil
               end
             else
               result_options[:status] = Metasploit::Model::Login::Status::INCORRECT
@@ -86,6 +88,12 @@ module Metasploit
             elog(e, error: e)
             result_options[:status] = Metasploit::Model::Login::Status::UNABLE_TO_CONNECT
             result_options[:proof] = e
+          ensure
+            # Always tear down the client unless it was handed off as proof.
+            # Covers failed logins, successful logins that aren't kept as a
+            # session, and any error after the connection was established -
+            # all of which previously leaked the outbound TCP socket.
+            client.disconnect if client
           end
 
           ::Metasploit::Framework::LoginScanner::Result.new(result_options)

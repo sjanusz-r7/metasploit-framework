@@ -22,6 +22,19 @@ class Msf::Sessions::MSSQL < Msf::Sessions::Sql
     @info = "MSSQL #{datastore['USERNAME']} @ #{@peer_info}"
   end
 
+  # Cleans up the session.
+  #
+  # @return [void]
+  def cleanup
+    super
+  ensure
+    begin
+      @client.disconnect if @client.respond_to?(:disconnect)
+    rescue ::StandardError => e
+      elog('Error disconnecting MSSQL client during session cleanup', error: e)
+    end
+  end
+
   # Returns the type of session.
   #
   def self.type

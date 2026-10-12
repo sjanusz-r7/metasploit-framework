@@ -19,11 +19,34 @@ module Rex::Proto::MsTds
       raise ArgumentError.new('MsTds::Socket must be TCP') if @params.proto != 'tcp'
 
       @sock = Rex::Socket.create_param(@params)
+      @closed = false
       initialize_abstraction
 
       lsock.initinfo(@sock.peerinfo, @sock.localinfo)
 
       monitor_sock(@sock, sink: method(:_read_handler), name: 'MonitorLocal', on_exit: method(:_exit_handler))
+    end
+
+    # Shut down the sockets in this channel to allow background threads to fully clean up asynchronously in it's own thread.
+    #
+    # @return [void]
+    def close
+      return if @closed
+
+      @closed = true
+
+      # End the @sock -> rsock relay. The relay fiber reading @sock sees EOF,
+      # finishes, and closes @sock (and rsock, via _exit_handler).
+      begin
+        @sock.shutdown(::Socket::SHUT_RDWR) if @sock
+      rescue ::IOError, ::StandardError
+      end
+
+      # Close the lsock relay. It's own thread ensures it gets cleaned up.
+      begin
+        lsock.close if lsock && !lsock.closed?
+      rescue ::IOError, ::StandardError
+      end
     end
 
     def write(buf, opts = {})
