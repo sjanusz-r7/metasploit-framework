@@ -26,10 +26,10 @@ module Payload::Python::MeterpreterLoader
       'Author'        => [ 'Spencer McIntyre' ],
       'Platform'      => 'python',
       'Arch'          => ARCH_PYTHON,
-      'Stager'        => {'Payload' => ""},
-      'SupportedVersions' => {
-        'Python' => [
-          Module::VersionRange.new(min: Msf::Payload::Python::MeterpreterVersion::MINIMUM_VERSION, max: '2.7'),
+      'Stager' => { 'Payload' => '' },
+      'PlatformVersions' => {
+        'python' => [
+          Module::VersionRange.new(min: Msf::Payload::Python::MeterpreterVersion::MINIMUM_VERSION, max: '3.0', exclude_max: true),
           Module::VersionRange.new(min: '3.1')
         ]
       }

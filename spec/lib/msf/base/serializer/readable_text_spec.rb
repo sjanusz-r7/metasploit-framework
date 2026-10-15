@@ -4,6 +4,25 @@ require 'spec_helper'
 require 'rex/text'
 
 RSpec.describe Msf::Serializer::ReadableText do
+  describe '.dump_payload_module' do
+    it 'distinguishes inclusive, exclusive, and unbounded version ranges' do
+      payload = Msf::Payload.new(
+        'Name' => 'Test payload',
+        'Description' => 'Test payload description',
+        'PlatformVersions' => {
+          'python' => [
+            Msf::Module::VersionRange.new(min: '2.5', max: '3.0', exclude_max: true),
+            Msf::Module::VersionRange.new(min: '3.1', max: '3.12'),
+            Msf::Module::VersionRange.new(min: '3.13'),
+            Msf::Module::VersionRange.new(max: '2.4')
+          ]
+        }
+      )
+
+      expect(described_class.dump_payload_module(payload)).to include('Python: >= 2.5 and < 3.0 or >= 3.1 and <= 3.12 or >= 3.13 or <= 2.4')
+    end
+  end
+
   # The described_class API takes a mix of strings and whitespace character counts
   let(:indent_string) { '' }
   let(:indent_length) { indent_string.length }

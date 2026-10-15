@@ -1,20 +1,27 @@
 # -*- coding: binary -*-
+# frozen_string_literal: true
 
 require 'rex/version'
 
 #
 # Provides a wrapper around a minimum and maximum version range.
-# A range has a required minimum version and an optional maximum version.
-# When no maximum is set, all versions >= min are considered within range.
+# Either bound may be omitted. With neither bound, every valid version is
+# contained in the range.
 #
 class Msf::Module::VersionRange
 
-  def initialize(min: nil, max: nil)
-    raise "Improper argument(s) supplied to #{self.class}" unless valid_version_value?(min)
-    raise "Improper argument(s) supplied to #{self.class}" unless max.nil? || valid_version_value?(max)
+  # @param min [String, Integer, Rex::Version, nil] Optional lower bound.
+  # @param max [String, Integer, Rex::Version, nil] Optional upper bound.
+  # @param exclude_max [Boolean] Whether the upper bound is exclusive.
+  def initialize(min: nil, max: nil, exclude_max: false)
+    raise ArgumentError, 'Invalid minimum version' unless min.nil? || valid_version_value?(min)
+    raise ArgumentError, 'Invalid maximum version' unless max.nil? || valid_version_value?(max)
 
-    self.min = to_version(min)
+    self.min = min.nil? ? nil : to_version(min)
     self.max = max.nil? ? nil : to_version(max)
+    raise ArgumentError, 'Maximum version precedes minimum version' if self.min && self.max && self.max < self.min
+
+    @exclude_max = exclude_max
   end
 
   # Check whether a value is acceptable as a version argument.
@@ -42,7 +49,8 @@ class Msf::Module::VersionRange
   end
 
   # Does this version range contain the specified version?
-  # A version is contained if it is >= min and, if a max is defined, <= max.
+  # A version is contained if it is >= min and, if a max is defined, <= max
+  # (or < max when exclude_max is true).
   #
   # @param version [String, Integer, Rex::Version] The version to check.
   # @return [Boolean, nil] true/false, or nil if the version value is invalid.
@@ -51,10 +59,23 @@ class Msf::Module::VersionRange
 
     ver = to_version(version)
 
-    # If we don't have a maximum version defined, all versions >= min are OK.
-    return ver >= min if max.nil?
+    return false if min && ver < min
+    return true if max.nil?
 
-    ver.between?(min, max)
+    exclude_max ? ver < max : ver <= max
+  end
+
+  # Describe both bounds, optionally formatting versions for display.
+  #
+  # @yieldparam version [Rex::Version] A bound to format.
+  # @yieldreturn [String] The displayed version.
+  # @return [String] A description of the supported versions.
+  def description(&formatter)
+    formatter ||= lambda(&:to_s)
+    bounds = []
+    bounds << ">= #{formatter.call(min)}" if min
+    bounds << "#{exclude_max ? '<' : '<='} #{formatter.call(max)}" if max
+    bounds.empty? ? 'any version' : bounds.join(' and ')
   end
 
   # Normalize a value to Rex::Version.
@@ -65,11 +86,14 @@ class Msf::Module::VersionRange
     value.is_a?(Rex::Version) ? value : Rex::Version.new(value.to_s)
   end
 
-  # @return [Rex::Version] The minimum version (inclusive).
+  # @return [Rex::Version, nil] The minimum version (inclusive), or nil for unbounded.
   attr_accessor :min
 
-  # @return [Rex::Version, nil] The maximum version (inclusive), or nil for unbounded.
+  # @return [Rex::Version, nil] The upper bound, or nil for unbounded.
   attr_accessor :max
+
+  # @return [Boolean] Whether the upper bound is exclusive.
+  attr_reader :exclude_max
 
   private
 

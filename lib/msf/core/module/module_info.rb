@@ -43,13 +43,13 @@ module Msf::Module::ModuleInfo
   end
 
   #
-  # Return the module's supported software runtime versions.
-  # For example:
-  # - Windows -> XP_SP1
-  # - Python -> 3.4
+  # Return supported platform version ranges, keyed by normalized platform
+  # names such as 'win' or 'python'.
   #
-  def supported_versions
-    module_info['SupportedVersions']
+  # @return [Hash{String => Array<Msf::Module::VersionRange>}, nil]
+  #
+  def platform_versions
+    module_info['PlatformVersions']
   end
 
   #

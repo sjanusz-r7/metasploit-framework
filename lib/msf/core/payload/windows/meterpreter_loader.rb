@@ -26,9 +26,9 @@ module Payload::Windows::MeterpreterLoader
       'Platform'      => 'win',
       'Arch'          => ARCH_X86,
       'PayloadCompat' => { 'Convention' => 'sockedi handleedi -https', },
-      'Stage'         => { 'Payload'   => "" },
-      'SupportedVersions' => {
-        'Windows' => [
+      'Stage' => { 'Payload' => '' },
+      'PlatformVersions' => {
+        'win' => [
           Module::VersionRange.new(min: Msf::Payload::Windows::MeterpreterVersion::MINIMUM_VERSION)
         ]
       }

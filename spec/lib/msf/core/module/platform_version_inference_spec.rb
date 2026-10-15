@@ -1,10 +1,10 @@
 require 'spec_helper'
 
-RSpec.describe Msf::Module::RuntimeVersionInference do
+RSpec.describe Msf::Module::PlatformVersionInference do
   describe '.infer' do
     it 'infers the Windows runtime version from a target name' do
       result = described_class.infer('Windows 7 SP1')
-      expect(result).to eq('Windows' => Msf::WindowsVersion::Win7_SP1)
+      expect(result).to eq('win' => Msf::WindowsVersion::Win7_SP1)
     end
 
     it 'returns an empty hash for a generic name' do
@@ -12,7 +12,7 @@ RSpec.describe Msf::Module::RuntimeVersionInference do
     end
 
     it 'does not overwrite a runtime that is already set' do
-      existing = { 'Windows' => Msf::WindowsVersion::XP_SP2 }
+      existing = { 'win' => Msf::WindowsVersion::XP_SP2 }
       expect(described_class.infer('Windows 7 SP1', existing: existing)).to eq({})
     end
 
@@ -24,12 +24,12 @@ RSpec.describe Msf::Module::RuntimeVersionInference do
 
     it 'applies inferrers when the declared platform matches' do
       result = described_class.infer('Windows 7', platform_names: ['win'])
-      expect(result).to eq('Windows' => Msf::WindowsVersion::Win7_SP0)
+      expect(result).to eq('win' => Msf::WindowsVersion::Win7_SP0)
     end
 
     it 'falls back to name-based inference when no platform is declared' do
       result = described_class.infer('Windows 7', platform_names: nil)
-      expect(result).to eq('Windows' => Msf::WindowsVersion::Win7_SP0)
+      expect(result).to eq('win' => Msf::WindowsVersion::Win7_SP0)
     end
   end
 

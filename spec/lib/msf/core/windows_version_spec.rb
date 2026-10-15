@@ -112,6 +112,8 @@ RSpec.describe Msf::WindowsVersion do
       it 'returns the oldest as the minimum version' do
         expect(described_class.from_target_name('Windows XP SP2/SP3')).to eq(described_class::XP_SP2)
         expect(described_class.from_target_name('Windows XP SP0/SP1')).to eq(described_class::XP_SP0)
+        expect(described_class.from_target_name('Windows XP SP3 / Windows XP SP2')).to eq(described_class::XP_SP2)
+        expect(described_class.from_target_name('Windows XP SP3 / Windows XP')).to eq(described_class::XP_SP0)
       end
     end
 
@@ -134,7 +136,16 @@ RSpec.describe Msf::WindowsVersion do
       [
         'Chasys Draw IES 4.10.01 / Windows XP SP3 / Windows 7 SP1',
         'Adobe Reader v8.x / Windows XP SP3 / Windows Vista/7/10',
-        '<Win Xp, Win 7, Win 8, Win 10>'
+        '<Win Xp, Win 7, Win 8, Win 10>',
+        'Windows NT/2000/XP/2003 (SLMail 5.5)',
+        'Windows NT/XP',
+        'Windows XP / 2003',
+        'Windows XP and 2003',
+        'Windows XP or 2003',
+        'Windows XP, 2003',
+        'Windows XP SP3/2003 Server R2 SP2 (DEP Bypass)',
+        'Windows 7 / 8',
+        'Windows Vista/7/10'
       ].each do |name|
         it "returns nil for the ambiguous name #{name.inspect}" do
           expect(described_class.from_target_name(name)).to be_nil
@@ -166,6 +177,14 @@ RSpec.describe Msf::WindowsVersion do
     it 'does not match a bare version number without a Windows prefix' do
       # "8.1" here is a product version, not Windows 8.1.
       expect(described_class.from_target_name('BEA WebLogic 8.1 SP4')).to be_nil
+    end
+
+    it 'does not apply an application service pack to Windows' do
+      expect(described_class.from_target_name('SomeApp SP1 on Windows XP SP3')).to eq(described_class::XP_SP3)
+      expect(described_class.from_target_name('SomeApp SP1 on Windows XP')).to eq(described_class::XP_SP0)
+      expect(described_class.from_target_name('Windows XP SP3 / SomeApp SP1')).to eq(described_class::XP_SP3)
+      expect(described_class.from_target_name('Windows XP SP3/SomeApp SP1')).to eq(described_class::XP_SP3)
+      expect(described_class.from_target_name('Windows XP SP3 and SomeApp SP1')).to eq(described_class::XP_SP3)
     end
 
     it 'returns nil for non-string input' do

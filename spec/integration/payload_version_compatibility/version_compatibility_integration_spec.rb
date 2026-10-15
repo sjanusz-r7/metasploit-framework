@@ -21,8 +21,8 @@ RSpec.describe 'Payload version compatibility integration' do
   let(:mock_module_info_with_minimum_versions) do
     {
       'Name' => 'Mock Payload',
-      'SupportedVersions' => {
-        'Windows' => [Msf::Module::VersionRange.new(min: Msf::WindowsVersion::XP_SP2)]
+      'PlatformVersions' => {
+        'win' => [Msf::Module::VersionRange.new(min: Msf::WindowsVersion::XP_SP2)]
       }
     }
   end
@@ -30,13 +30,13 @@ RSpec.describe 'Payload version compatibility integration' do
   # Mock payload
   let(:payload_with_minimum_versions) do
     instance = instance_double(Msf::Payload)
-    allow(instance).to receive(:supported_versions).and_return(mock_module_info_with_minimum_versions['SupportedVersions'])
+    allow(instance).to receive(:platform_versions).and_return(mock_module_info_with_minimum_versions['PlatformVersions'])
     instance
   end
 
   let(:payload_without_minimum_versions) do
     instance = instance_double(Msf::Payload)
-    allow(instance).to receive(:supported_versions).and_return(mock_module_info_without_minimum_versions['SupportedVersions'])
+    allow(instance).to receive(:platform_versions).and_return(mock_module_info_without_minimum_versions['PlatformVersions'])
     instance
   end
 
@@ -46,12 +46,12 @@ RSpec.describe 'Payload version compatibility integration' do
         exploit.datastore['TARGET'] = windows_2000_universal_index
       end
 
-      it 'warns for payload with SupportedVersions' do
+      it 'warns for payload with PlatformVersions' do
         warnings = exploit.version_compatibility_warnings(payload_with_minimum_versions)
-        expect(warnings).to eq(['Payload requires Windows version within a supported range (minimum Windows XP Service Pack 2 (5.1.2600.2)), but the target provides Windows 2000 (5.0.2195)'])
+        expect(warnings).to eq(['Payload supports Windows versions >= Windows XP Service Pack 2 (5.1.2600.2), but the target provides Windows 2000 (5.0.2195)'])
       end
 
-      it 'does not warn for payload without SupportedVersions' do
+      it 'does not warn for payload without PlatformVersions' do
         warnings = exploit.version_compatibility_warnings(payload_without_minimum_versions)
         expect(warnings).to be_empty
       end
@@ -62,9 +62,9 @@ RSpec.describe 'Payload version compatibility integration' do
         exploit.datastore['TARGET'] = windows_xp_sp0_index
       end
 
-      it 'warns for payload with SupportedVersions' do
+      it 'warns for payload with PlatformVersions' do
         warnings = exploit.version_compatibility_warnings(payload_with_minimum_versions)
-        expect(warnings).to eq(["Payload requires Windows version within a supported range (minimum Windows XP Service Pack 2 (5.1.2600.2)), but the target provides Windows XP (5.1.2600.0)"])
+        expect(warnings).to eq(['Payload supports Windows versions >= Windows XP Service Pack 2 (5.1.2600.2), but the target provides Windows XP (5.1.2600.0)'])
       end
     end
 
@@ -73,20 +73,24 @@ RSpec.describe 'Payload version compatibility integration' do
         exploit.datastore['TARGET'] = windows_xp_sp2_index
       end
 
-      it 'does not warn for payload with SupportedVersions' do
+      it 'does not warn for payload with PlatformVersions' do
         warnings = exploit.version_compatibility_warnings(payload_with_minimum_versions)
         expect(warnings).to be_empty
       end
     end
 
-    context 'when target is Automatic (no RuntimeVersions declared)' do
+    context 'when target is Automatic (no PlatformVersions declared)' do
       before do
         exploit.datastore['TARGET'] = automatic_target_index
       end
 
-      it 'warns with the lowest common denominator' do
+      it 'warns for each incompatible concrete target' do
         warnings = exploit.version_compatibility_warnings(payload_with_minimum_versions)
-        expect(warnings).to eq(["Payload requires Windows version within a supported range (minimum Windows XP Service Pack 2 (5.1.2600.2)), but the target provides Windows 2000 (5.0.2195)"])
+        expect(warnings).to include(
+          "Payload supports Windows versions >= Windows XP Service Pack 2 (5.1.2600.2), but the target provides Windows 2000 (5.0.2195) (target: #{exploit.targets[windows_2000_universal_index].name})",
+          "Payload supports Windows versions >= Windows XP Service Pack 2 (5.1.2600.2), but the target provides Windows XP (5.1.2600.0) (target: #{exploit.targets[windows_xp_sp0_index].name})"
+        )
+        expect(warnings).to all(include('(target: '))
       end
     end
 
@@ -95,7 +99,7 @@ RSpec.describe 'Payload version compatibility integration' do
         exploit.datastore['TARGET'] = windows_2003_index
       end
 
-      it 'does not warn for payload with SupportedVersions' do
+      it 'does not warn for payload with PlatformVersions' do
         warnings = exploit.version_compatibility_warnings(payload_with_minimum_versions)
         expect(warnings).to be_empty
       end

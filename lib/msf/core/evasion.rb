@@ -19,6 +19,7 @@ module Msf
 
       self.payload_info = info['Payload'] || {}
       self.targets = Rex::Transformer.transform(info['Targets'], Array, [ Target ], 'Targets')
+      targets.each { |candidate| candidate.inherit_platform(module_info['Platform']) } if targets
 
       if info.key? 'DefaultTarget'
         self.default_target = info['DefaultTarget']
