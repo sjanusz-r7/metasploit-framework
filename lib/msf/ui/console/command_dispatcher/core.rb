@@ -2256,8 +2256,9 @@ class Core
         end
       end
 
-      if current_payload
-        payload_instance = framework.payloads.create(current_payload)
+      selected_payload = active_module.datastore['PAYLOAD']
+      if selected_payload
+        payload_instance = framework.payloads.create(selected_payload)
         if payload_instance
           warnings = active_module.version_compatibility_warnings(payload_instance)
           warnings.each { |w| print_warning(w) }

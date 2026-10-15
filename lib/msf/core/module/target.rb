@@ -154,7 +154,7 @@ class Msf::Module::Target
       self.bruteforce = Bruteforce.new(opts['Bruteforce'])
     end
 
-    infer_runtime_versions
+    infer_platform_versions
   end
 
   #
@@ -173,14 +173,31 @@ class Msf::Module::Target
   end
 
   #
-  # Returns the runtime version requirements for this target, if any. This is
+  # Returns the platform version requirements for this target, if any. This is
   # the metadata consulted when checking whether a payload is compatible with
   # the target (see Msf::Module::VersionCompatibility). It may be supplied
-  # explicitly via the target's 'RuntimeVersions' option, or inferred from the
+  # explicitly via the target's 'PlatformVersions' option, or inferred from the
   # target name on creation.
   #
-  def runtime_versions
-    opts['RuntimeVersions']
+  # @return [Hash{String => Rex::Version, String}, nil] Concrete platform versions.
+  def platform_versions
+    opts['PlatformVersions']
+  end
+
+  # Inherit the module platform when the target does not declare one.
+  #
+  # @param default_platform [String, Array, Msf::Module::PlatformList, nil] Module platform.
+  # @return [void]
+  def inherit_platform(default_platform)
+    return if platform || default_platform.nil?
+
+    self.platform = if default_platform.is_a?(Msf::Module::PlatformList)
+                      default_platform
+                    else
+                      Msf::Module::PlatformList.transform(default_platform)
+                    end
+    self.opts = opts.merge('Platform' => platform.platforms)
+    infer_platform_versions
   end
 
   ##
@@ -339,40 +356,40 @@ class Msf::Module::Target
 protected
 
   #
-  # Attempt to automatically tag this target with runtime version metadata
+  # Attempt to automatically tag this target with platform version metadata
   # derived from its name (e.g. a target named "Windows 7 SP1" is tagged with
-  # 'RuntimeVersions' => { 'Windows' => Win7_SP1 }).
+  # 'PlatformVersions' => { 'win' => Win7_SP1 }).
   #
   # This complements manual tagging: versions supplied explicitly in the
-  # target's 'RuntimeVersions' option are always preserved. Inference is
-  # delegated to Msf::Module::RuntimeVersionInference, which is the extension
-  # point for supporting additional runtimes (macOS, Linux, ...) in future.
+  # target's 'PlatformVersions' option are always preserved. Inference is
+  # delegated to Msf::Module::PlatformVersionInference, which is the extension
+  # point for supporting additional platforms (macOS, Linux, ...) in future.
   # Generic or ambiguous names are left untagged.
   #
-  def infer_runtime_versions
-    existing = opts['RuntimeVersions']
+  def infer_platform_versions
+    return if platform.nil? || platform.empty?
+
+    existing = opts['PlatformVersions']
     existing = {} unless existing.is_a?(Hash)
 
-    inferred = Msf::Module::RuntimeVersionInference.infer(
+    inferred = Msf::Module::PlatformVersionInference.infer(
       name,
       existing: existing,
       platform_names: declared_platform_names
     )
     return if inferred.empty?
 
-    self.opts = opts.merge('RuntimeVersions' => existing.merge(inferred))
+    self.opts = opts.merge('PlatformVersions' => existing.merge(inferred))
   end
 
   #
-  # The lower-cased platform names declared directly on this target, or nil when
-  # the target declares no platform (in which case runtime inference falls back
-  # to the target name alone).
+  # The normalized short names of the effective target platforms, including
+  # platforms inherited from the module.
   #
   def declared_platform_names
-    platform_opt = opts['Platform']
-    return nil if platform_opt.nil?
-
-    Array(platform_opt).map { |entry| entry.to_s.downcase }
+    platform&.platforms&.map do |entry|
+      entry <= Msf::Module::Platform::Windows ? 'win' : entry.realname.downcase
+    end
   end
 
   attr_writer :name, :platform, :arch, :opts, :ret, :save_registers # :nodoc:

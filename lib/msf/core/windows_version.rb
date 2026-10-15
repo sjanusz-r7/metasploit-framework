@@ -88,7 +88,7 @@ module Msf
 
     WorkstationNameMapping = {
       :Win2000 => "Windows 2000",
-      :Win2000_SP4 => "Windows 2000 Service Pack 4",
+      Win2000_SP4: 'Windows 2000 Service Pack 4',
       :XP_SP0 => "Windows XP",
       :XP_SP1 => "Windows XP Service Pack 1",
       :XP_SP2 => "Windows XP Service Pack 2",
@@ -372,7 +372,10 @@ module Msf
     def self.from_target_name(name)
       return nil unless name.is_a?(String) && !name.empty?
 
-      service_packs = service_packs_from_name(name)
+      # Abbreviated OS alternatives are not all recognized by the family
+      # patterns below. Do not turn a partial match into a concrete version.
+      return nil if name.match?(%r{(?:/|,|\band\b|\bor\b)\s*(?:2000|2003|2008|2012|2016|2019|2022|2025|7|8(?:\.1)?|10|11)\b(?!\.)}i)
+      return nil if name.match?(%r{\bnt(?:\s+[^/]*)?/}i)
 
       matched = []
       remaining = name.dup
@@ -390,7 +393,13 @@ module Msf
       # versions) - not safe to tag automatically.
       return nil unless matched.length == 1
 
-      resolve_family_version(matched.first, service_packs)
+      # A product's service pack before the OS name must not qualify Windows.
+      versions = []
+      name.to_enum(:scan, matched.first[:pattern]).each do
+        os_description = name[Regexp.last_match.end(0)..].split(%r{/(?!\s*(?:sp\s*\d|service\s*pack\s*\d|\d+\b))|,|\band\b|\bor\b}i, 2).first.to_s
+        versions << resolve_family_version(matched.first, service_packs_from_name(os_description))
+      end
+      versions.min
     end
 
     # Resolve a matched family to a concrete version, honouring any service

@@ -503,9 +503,15 @@ class Payload < Msf::Module
       payload
     end
 
-    # If there is only one compatible payload, return it immediately
+    version_compatible = lambda do |payload|
+      instance = mod.framework.payloads.create(payload)
+      instance && mod.version_compatibility_warnings(instance).empty?
+    end
+
+    # The platform/architecture filter does not check version requirements.
     if compatible_payloads.length == 1
-      return configure_payload.call(compatible_payloads.first)
+      payload = compatible_payloads.first
+      return version_compatible.call(payload) ? configure_payload.call(payload) : nil
     end
 
     # XXX: This approach is subpar, and payloads should really be ranked!
@@ -526,16 +532,9 @@ class Payload < Msf::Module
 
     # XXX: This is not efficient in the slightest
     preferred_payloads.each do |type|
-      payload = compatible_payloads.find { |name| name.end_with?(type) }
+      payload = compatible_payloads.find { |name| name.end_with?(type) && version_compatible.call(name) }
 
       next unless payload
-
-      # Skip payloads that don't meet the target's version requirements
-      payload_instance = mod.framework.payloads.create(payload)
-      if payload_instance
-        warnings = mod.version_compatibility_warnings(payload_instance)
-        next unless warnings.empty?
-      end
 
       return configure_payload.call(payload)
     end

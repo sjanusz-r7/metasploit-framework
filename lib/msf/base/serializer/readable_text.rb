@@ -496,16 +496,17 @@ class ReadableText
     output << "           Module: #{mod.fullname}\n"
     output << "         Platform: #{mod.platform_to_s}\n"
     output << "             Arch: #{mod.arch_to_s}\n"
-    output << "      Needs Admin: " + (mod.privileged? ? "Yes" : "No") + "\n"
+    output << '      Needs Admin: ' + (mod.privileged? ? 'Yes' : 'No') + "\n"
     output << "       Total size: #{mod.size}\n"
     output << "             Rank: #{mod.rank_to_s.capitalize}\n"
 
-    required_versions = mod.supported_versions
+    required_versions = mod.platform_versions
     if required_versions && required_versions.any?
       output << "Supported Versions:\n"
-      required_versions.each do |runtime, ranges|
-        ranges_desc = ranges.map { |r| r.max ? "#{r.min}..#{r.max}" : "#{r.min}+" }.join(', ')
-        output << "  #{runtime}: #{ranges_desc}\n"
+      required_versions.each do |platform, ranges|
+        ranges_desc = ranges.map(&:description).join(' or ')
+        platform_name = Msf::Module::Platform.find_platform(platform).realname
+        output << "  #{platform_name}: #{ranges_desc}\n"
       end
     end
     output << "\n"
