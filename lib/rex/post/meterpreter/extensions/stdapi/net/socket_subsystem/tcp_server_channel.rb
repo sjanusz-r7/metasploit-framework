@@ -17,13 +17,9 @@ class TcpServerChannel < Rex::Post::Meterpreter::Channel
 
   include Rex::IO::StreamServer
 
-  #
-  # This is a class variable to store all pending client tcp connections which have not been passed
-  # off via a call to the respective server tcp channels accept method. The dictionary key is the
-  # tcp server channel instance and the values held are an array of pending tcp client channels
-  # connected to the tcp server channel.
-  #
-  @@server_channels = {}
+  # Keep the pending accept backlog bounded so an unconsumed remote listener
+  # cannot create an unlimited number of local socket pairs.
+  MAX_PENDING_ACCEPTS = 128
 
   #
   # This is the request handler which is registered to the respective meterpreter instance via
@@ -44,21 +40,36 @@ class TcpServerChannel < Rex::Post::Meterpreter::Channel
 
     return false if server_channel.nil?
 
+    unless server_channel.pending_accept_available?
+      reject_remote_client(client, cid)
+      return true
+    end
+
     params = Rex::Socket::Parameters.from_hash(
       {
-        'Proto'     => 'tcp',
-        'Comm'      => server_channel.client
+        'Proto' => 'tcp',
+        'Comm' => server_channel.client
       }
     )
 
     client_channel = TcpClientChannel.new(client, cid, TcpClientChannel, CHANNEL_FLAG_SYNCHRONOUS, packet, sock_params: params)
     ilog("enqueueing new TCP client with channel id #{cid}")
 
-    @@server_channels[server_channel] ||= ::Queue.new
-    @@server_channels[server_channel].enq(client_channel)
+    unless server_channel.enqueue_pending_client(client_channel)
+      server_channel.schedule_pending_client_cleanup([client_channel])
+    end
 
     true
   end
+
+  def self.reject_remote_client(client, cid)
+    request = Packet.create_request(COMMAND_ID_CORE_CHANNEL_CLOSE)
+    request.add_tlv(TLV_TYPE_CHANNEL_ID, cid)
+    client.send_packet(request)
+  rescue StandardError => e
+    elog("Failed to reject pending TCP client channel #{cid}", error: e)
+  end
+  private_class_method :reject_remote_client
 
   def self.cls
     CHANNEL_CLASS_STREAM
@@ -71,8 +82,8 @@ class TcpServerChannel < Rex::Post::Meterpreter::Channel
   def self.open(client, params)
     Channel.create(client, 'stdapi_net_tcp_server', self, CHANNEL_FLAG_SYNCHRONOUS,
       [
-        {'type'  => TLV_TYPE_LOCAL_HOST, 'value' => params.localhost},
-        {'type'  => TLV_TYPE_LOCAL_PORT, 'value' => params.localport}
+        { 'type' => TLV_TYPE_LOCAL_HOST, 'value' => params.localhost },
+        { 'type' => TLV_TYPE_LOCAL_PORT, 'value' => params.localport }
       ],
       sock_params: params
     )
@@ -82,10 +93,10 @@ class TcpServerChannel < Rex::Post::Meterpreter::Channel
   # Simply initialize this instance.
   #
   def initialize(client, cid, type, flags, packet, sock_params: nil)
+    # Initialize the queue before registering the channel so an inbound open
+    # cannot observe a server without a pending-accept queue.
+    @pending_accepts = ::SizedQueue.new(MAX_PENDING_ACCEPTS)
     super(client, cid, type, flags, packet)
-
-    # add this instance to the class variables dictionary of tcp server channels
-    @@server_channels[self] ||= ::Queue.new
 
     unless sock_params.nil?
       @params = sock_params.merge(Socket.parameters_from_response(packet))
@@ -110,11 +121,34 @@ class TcpServerChannel < Rex::Post::Meterpreter::Channel
   #
   def accept(opts = {})
     timeout = opts['Timeout']
-    if (timeout.nil? || timeout <= 0)
+    if timeout.nil? || timeout <= 0
       timeout = nil
     end
 
     _accept(timeout: timeout)
+  end
+
+  def pending_accept_available?
+    !@pending_accepts.closed? && @pending_accepts.length < @pending_accepts.max
+  end
+
+  def enqueue_pending_client(channel)
+    @pending_accepts.push(channel, true)
+    true
+  rescue ThreadError, ClosedQueueError
+    false
+  end
+
+  def schedule_pending_client_cleanup(channels)
+    return if channels.empty?
+
+    cleanup_task = proc do
+      channels.each { |channel| close_pending_client(channel) }
+    end
+    client.framework.sessions.schedule(cleanup_task)
+  rescue StandardError => e
+    elog('Failed to schedule pending TCP client cleanup', error: e)
+    cleanup_task&.call
   end
 
 protected
@@ -126,18 +160,18 @@ protected
 
     begin
       if nonblock
-        channel = @@server_channels[self].deq(true)
+        channel = @pending_accepts.deq(true)
       elsif timeout
-        channel = @@server_channels[self].deq(timeout: timeout)
+        channel = @pending_accepts.deq(timeout: timeout)
       else
-        channel = @@server_channels[self].deq
+        channel = @pending_accepts.deq
       end
 
       if channel
         result = channel.lsock
       end
 
-      if result != nil && !result.kind_of?(Rex::Socket::Tcp)
+      if !result.nil? && !result.is_a?(Rex::Socket::Tcp)
         result.extend(Rex::Socket::Tcp)
       end
     rescue ThreadError
@@ -145,6 +179,58 @@ protected
     end
 
     result
+  end
+
+  def _close(addends = nil)
+    super
+  ensure
+    cleanup
+  end
+
+  def cleanup
+    pending_clients = drain_pending_clients
+    schedule_pending_client_cleanup(pending_clients)
+    super
+  end
+
+  def drain_pending_clients
+    pending_clients = []
+    @pending_accepts.close
+
+    loop do
+      channel = @pending_accepts.pop(true)
+      break unless channel
+
+      pending_clients << channel
+    end
+  rescue ThreadError
+    pending_clients
+  end
+
+  def close_pending_client(channel)
+    channel_id = channel.cid
+
+    begin
+      channel.close
+    rescue IOError
+      nil
+    rescue StandardError => e
+      elog("Failed to close pending TCP client channel #{channel_id}", error: e)
+    ensure
+      unless channel.closed?
+        ObjectSpace.undefine_finalizer(channel)
+        channel.send(:cid=, nil)
+        channel.client.remove_channel(channel_id)
+      end
+
+      begin
+        channel.send(:cleanup)
+      rescue IOError
+        nil
+      rescue StandardError => e
+        elog("Failed to clean up pending TCP client channel #{channel_id}", error: e)
+      end
+    end
   end
 
 end
