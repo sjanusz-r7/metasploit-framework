@@ -299,12 +299,11 @@ protected
     # Notify waiters that they should be ready to rock
     session_waiter_event.notify(session)
 
-    # Decrement the pending connections counter now that we've processed
-    # one session.
-    self.pending_connections -= 1
-
     # Count the number of sessions we have registered
     self.sessions += 1
+  ensure
+    # Some handlers register sessions without tracking pending connections.
+    self.pending_connections -= 1 if pending_connections.positive?
   end
 
   attr_accessor :session_waiter_event # :nodoc:
