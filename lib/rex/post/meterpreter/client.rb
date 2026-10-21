@@ -85,34 +85,84 @@ class Client
   end
 
   #
-  # Cleans up the meterpreter instance, terminating the dispatcher thread.
+  # Cleans up the meterpreter instance, terminating the dispatcher threads.
+  #
+  # Each stage is individually guarded so that a failure in one phase
+  # (pivots, extensions, threads, passive dispatcher, TLV logging) cannot
+  # prevent the remaining teardown from completing.
+  #
+  # This method is idempotent. Meterpreter#kill calls it directly before
+  # deregistration triggers it again through the cleanup chain.
   #
   def cleanup_meterpreter
-    if self.pivot_session
-      self.pivot_session.remove_pivot_session(self.session_guid)
+    return if @cleanup_meterpreter_called
+
+    @cleanup_meterpreter_called = true
+
+    begin
+      if self.pivot_session
+        self.pivot_session.remove_pivot_session(self.session_guid)
+      end
+    rescue StandardError => e
+      elog('Exception removing pivot session during Meterpreter cleanup', error: e)
     end
 
-    self.pivot_sessions.keys.each do |k|
-      pivot = self.pivot_sessions[k]
-      pivot.pivoted_session.kill('Pivot closed')
-      pivot.pivoted_session.shutdown_passive_dispatcher
+    begin
+      self.pivot_sessions.keys.each do |k|
+        begin
+          pivot = self.pivot_sessions[k]
+          pivot.pivoted_session.kill('Pivot closed')
+          pivot.pivoted_session.shutdown_passive_dispatcher
+        rescue StandardError => e
+          elog("Exception cleaning up pivot session #{k}", error: e)
+        end
+      end
+    rescue StandardError => e
+      elog('Exception iterating pivot sessions during cleanup', error: e)
     end
 
     unless self.skip_cleanup
-      ext.aliases.each_value do | extension |
-        extension.cleanup if extension.respond_to?( 'cleanup' )
+      begin
+        ext.aliases.each_value do |extension|
+          begin
+            extension.cleanup if extension.respond_to?('cleanup')
+          rescue StandardError => e
+            elog("Exception cleaning up extension #{extension.class}", error: e)
+          end
+        end
+      rescue StandardError => e
+        elog('Exception iterating extensions during cleanup', error: e)
       end
     end
 
-    dispatcher_thread.kill if dispatcher_thread
-
-    unless self.skip_cleanup
-      core.shutdown rescue nil
+    # Use monitor_stop to deterministically kill, join, and nil both
+    # receiver and dispatcher threads rather than only killing the
+    # dispatcher and relying on its ensure block to stop the receiver.
+    begin
+      monitor_stop
+    rescue StandardError => e
+      elog('Exception stopping monitor threads during Meterpreter cleanup', error: e)
     end
 
-    shutdown_passive_dispatcher
+    unless self.skip_cleanup
+      begin
+        core.shutdown
+      rescue StandardError => e
+        elog('Exception during remote core shutdown', error: e)
+      end
+    end
 
-    shutdown_tlv_logging
+    begin
+      shutdown_passive_dispatcher
+    rescue StandardError => e
+      elog('Exception shutting down passive dispatcher', error: e)
+    end
+
+    begin
+      shutdown_tlv_logging
+    rescue StandardError => e
+      elog('Exception shutting down TLV logging', error: e)
+    end
   end
 
   #

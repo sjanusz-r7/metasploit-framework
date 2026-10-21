@@ -232,30 +232,48 @@ class SessionManager < Hash
   #
   # Deregisters the supplied session object with the framework.
   #
+  # Each stage is wrapped in its own exception handler so that a failure in
+  # one phase (event callbacks, route removal, cleanup) cannot prevent the
+  # remaining teardown work from completing.
+  #
   def deregister(session, reason='')
-    return if not session.register?
+    return unless session.register?
 
-    if (session.dead? and not self[session.sid.to_i])
-      return
+    # Atomically check whether this session has already been deregistered and,
+    # if not, remove it from the manager and mark it dead. This prevents two
+    # concurrent deregister calls from both running the full teardown.
+    self.mutex.synchronize do
+      if session.dead? && !self[session.sid.to_i]
+        return
+      end
+
+      self.delete(session.sid.to_i)
+      session.alive = false
     end
 
     # Tell the framework that we have a parting session
-    framework.events.on_session_close(session, reason) rescue nil
+    begin
+      framework.events.on_session_close(session, reason)
+    rescue StandardError => e
+      elog("Exception in on_session_close for session #{session.sid}", error: e)
+    end
 
     # If this session implements the comm interface, remove any routes
     # that have been created for it.
-    if (session.kind_of?(Msf::Session::Comm))
-      Rex::Socket::SwitchBoard.remove_by_comm(session)
+    begin
+      if session.kind_of?(Msf::Session::Comm)
+        Rex::Socket::SwitchBoard.remove_by_comm(session)
+      end
+    rescue StandardError => e
+      elog("Exception removing routes for session #{session.sid}", error: e)
     end
 
-    # Remove it from the hash
-    self.delete(session.sid.to_i)
-
-    # Mark the session as dead
-    session.alive = false
-
     # Close it down
-    session.cleanup
+    begin
+      session.cleanup
+    rescue StandardError => e
+      elog("Exception during cleanup of session #{session.sid}", error: e)
+    end
   end
 
   #
