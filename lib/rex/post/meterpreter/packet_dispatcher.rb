@@ -55,6 +55,20 @@ module PacketDispatcher
   # @see #keepalive
   PING_TIME = 60
 
+  # Maximum number of packets that can be queued for dispatch. When the queue
+  # is full, the receiver thread blocks on push, which naturally applies TCP
+  # backpressure through the kernel socket buffer to the remote Meterpreter.
+  MAX_PACKET_QUEUE_SIZE = 500
+
+  # Maximum number of incomplete packets (packets waiting for a handler) to
+  # retain between dispatch cycles. Older unhandled packets are dropped.
+  MAX_INCOMPLETE_QUEUE_SIZE = 100
+
+  # Maximum number of outbound packets to queue for a passive (HTTP) session
+  # before logging a warning. The producer is the framework, not the remote
+  # target, so this is a stalled-consumer diagnostic rather than a hard drop.
+  MAX_PASSIVE_SEND_QUEUE_WARN = 1000
+
   # This mutex is used to lock out new commands during an
   # active migration. Unused if this is a passive dispatcher
   attr_accessor :comm_mutex
@@ -140,6 +154,9 @@ module PacketDispatcher
     # Short-circuit send when using a passive dispatcher
     if self.passive_service
       send_queue.push(raw)
+      if send_queue.length >= MAX_PASSIVE_SEND_QUEUE_WARN && (send_queue.length % MAX_PASSIVE_SEND_QUEUE_WARN).zero?
+        wlog("Passive send queue for session has grown to #{send_queue.length} packets; the agent may have stopped polling")
+      end
       return raw.size # Lie!
     end
 
@@ -311,7 +328,7 @@ module PacketDispatcher
     self.waiters = []
 
     # This queue is where the new incoming packets end up
-    @new_packet_queue = ::Queue.new
+    @new_packet_queue = ::SizedQueue.new(MAX_PACKET_QUEUE_SIZE)
     # This is where we put packets that aren't new, but haven't
     # yet been handled.
     @incomplete_queue = ::Queue.new
@@ -442,13 +459,12 @@ module PacketDispatcher
         end
 
         # If the old queue of packets gets too big...
-        if(@incomplete_queue.length > 100)
+        if(@incomplete_queue.length > MAX_INCOMPLETE_QUEUE_SIZE)
           removed = []
-          # Drop a bunch of them.
-          (1..25).each {
+          while @incomplete_queue.length > MAX_INCOMPLETE_QUEUE_SIZE
             removed << @incomplete_queue.pop
-          }
-          dlog("Backlog has grown to over 100 in monitor_socket, dropping older packets: #{removed.map{|x| x.inspect}.join(" - ")}", 'meterpreter', LEV_1)
+          end
+          dlog("Incomplete packet backlog exceeded #{MAX_INCOMPLETE_QUEUE_SIZE}, dropped #{removed.length} older packet(s): #{removed.map(&:inspect).join(' - ')}", 'meterpreter', LEV_1)
         end
       end
       rescue ::Exception => e

@@ -153,6 +153,8 @@ module Msf::Sessions
         output = data.to_s.gsub(/\r?\n/, "\r\n")
         @buffer_mutex.synchronize do
           @buffer << output
+          @buffer_bytesize += output.bytesize
+          enforce_stream_buffer_limit
         end
         @received_stdout_event.set
       end

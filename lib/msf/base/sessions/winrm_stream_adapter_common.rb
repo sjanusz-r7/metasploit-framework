@@ -10,11 +10,18 @@ module Msf::Sessions
   # Msf::Session::Provider::SingleCommandShell to read via #get_once.
   #
   module WinrmStreamAdapterCommon
+    # Default maximum buffer size in bytes. Matches Output::Buffer's default.
+    DEFAULT_MAX_BUFFER_BYTES = 4 * 1024 * 1024
+
+    TRUNCATION_MARKER = "[truncated: buffer exceeded byte limit]\n"
+
     # Includers must call this from #initialize before using #get_once,
     # #_get_once, or #append_output.
     def init_stream_buffer
       @buffer_mutex = Mutex.new
       @buffer = []
+      @buffer_bytesize = 0
+      @buffer_truncated = false
       # auto_reset is false: #get_once resets the event itself after every
       # wake-up, immediately before it re-checks the buffer. If the event
       # auto-reset on #set instead, a #set landing between that buffer check
@@ -66,14 +73,37 @@ module Msf::Sessions
       @buffer_mutex.synchronize do
         result = @buffer.join('')
         @buffer = []
+        @buffer_bytesize = 0
+        @buffer_truncated = false
         if (length > -1) && (result.length > length)
           # Return up to length, and keep the rest in the buffer.
           extra = result[length..]
           result = result[0, length]
           @buffer << extra
+          @buffer_bytesize = extra.bytesize
         end
       end
       result
+    end
+
+    private
+
+    # Called under @buffer_mutex after new entries have been appended.
+    # Trims from the front of @buffer to enforce the byte cap.
+    def enforce_stream_buffer_limit
+      return if @buffer_bytesize <= DEFAULT_MAX_BUFFER_BYTES
+
+      trimmed = 0
+      while @buffer_bytesize - trimmed > DEFAULT_MAX_BUFFER_BYTES && !@buffer.empty?
+        trimmed += @buffer.shift.bytesize
+      end
+      @buffer_bytesize -= trimmed
+
+      unless @buffer_truncated
+        @buffer.unshift(TRUNCATION_MARKER)
+        @buffer_bytesize += TRUNCATION_MARKER.bytesize
+        @buffer_truncated = true
+      end
     end
   end
 end

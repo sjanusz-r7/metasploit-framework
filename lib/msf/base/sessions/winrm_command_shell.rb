@@ -57,6 +57,8 @@ module Msf::Sessions
             end
             @buffer_mutex.synchronize do
               @buffer.concat(tmp_buffer)
+              tmp_buffer.each { |chunk| @buffer_bytesize += chunk.bytesize }
+              enforce_stream_buffer_limit
             end
 
             # If our last request received stdout, let's be ready for some more
